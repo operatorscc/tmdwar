@@ -45,14 +45,18 @@ function getAuctionState(auction: Auction, now: number): AuctionState {
     return { label: "DIBATALKAN", style: "cancelled" };
   }
 
-  if (auction.status === "ended" || now >= Date.parse(auction.ends_at)) {
+  const start = Date.parse(auction.starts_at);
+  const end = Date.parse(auction.ends_at);
+
+  if (auction.status === "ended" || (Number.isFinite(end) && now >= end)) {
     return { label: "LELANG SELESAI", style: "ended" };
   }
 
   if (
     auction.status === "draft" ||
     auction.status === "scheduled" ||
-    now < Date.parse(auction.starts_at)
+    !Number.isFinite(start) ||
+    now < start
   ) {
     return { label: "SEGERA HADIR", style: "upcoming" };
   }
@@ -78,11 +82,13 @@ function AuctionImage({
   src,
   alt,
   priority = false,
+  sizes = "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw",
   className = "",
 }: {
   src: string | null;
   alt: string;
   priority?: boolean;
+  sizes?: string;
   className?: string;
 }) {
   if (!src) {
@@ -101,7 +107,7 @@ function AuctionImage({
       alt={alt}
       fill
       priority={priority}
-      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+      sizes={sizes}
       className={`object-cover ${className}`}
     />
   );
@@ -113,24 +119,18 @@ export default async function HomePage() {
   const { data, error } = await supabase
     .from("auctions")
     .select(
-      [
-        "id",
-        "title",
-        "description",
-        "image_url",
-        "auction_mode",
-        "status",
-        "starting_price",
-        "current_price",
-        "min_increment",
-        "starts_at",
-        "ends_at",
-      ].join(", ")
+      "id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at"
     )
     .in("status", ["scheduled", "live", "ended"])
     .order("created_at", { ascending: false });
 
-  const auctions = (data ?? []) as Auction[];
+  // Memeriksa error sebelum menggunakan hasil query.
+  // Cast unknown digunakan agar tidak bertabrakan dengan
+  // GenericStringError[] dari tipe Supabase yang belum cocok.
+  const auctions: Auction[] = error
+    ? []
+    : ((data ?? []) as unknown as Auction[]);
+
   const now = Date.now();
 
   const auctionItems = auctions.map((auction) => ({
@@ -260,13 +260,12 @@ export default async function HomePage() {
                 <div className="relative flex flex-1 items-center justify-center py-5">
                   {featuredAuction?.image_url ? (
                     <div className="relative h-[230px] w-full sm:h-[300px]">
-                      <Image
+                      <AuctionImage
                         src={featuredAuction.image_url}
                         alt={featuredAuction.title}
-                        fill
                         priority
                         sizes="(max-width: 1024px) 100vw, 50vw"
-                        className="object-contain drop-shadow-2xl"
+                        className="absolute inset-0"
                       />
                     </div>
                   ) : (
@@ -333,7 +332,7 @@ export default async function HomePage() {
           </div>
 
           <span className="rounded-full border border-white/10 px-4 py-2 text-xs text-white/55">
-            {auctions.length} barang terdaftar
+            {error ? "Data belum tersedia" : `${auctions.length} barang terdaftar`}
           </span>
         </div>
 
@@ -344,7 +343,8 @@ export default async function HomePage() {
           >
             <p className="font-bold">Data lelang belum dapat dimuat.</p>
             <p className="mt-2 text-sm text-red-200/70">
-              Silakan coba kembali beberapa saat lagi.
+              Periksa koneksi Supabase, konfigurasi environment Vercel,
+              dan kebijakan akses tabel auctions.
             </p>
           </div>
         ) : auctions.length === 0 ? (
