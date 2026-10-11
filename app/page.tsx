@@ -30,15 +30,12 @@ function dateWIB(value: string | null) {
   if (!value) return "Jadwal belum ditentukan";
 
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Jadwal belum ditentukan";
-  }
+  if (Number.isNaN(date.getTime())) return "Jadwal belum ditentukan";
 
   return (
     new Intl.DateTimeFormat("id-ID", {
       day: "numeric",
-      month: "long",
+      month: "short",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
@@ -62,8 +59,10 @@ function getState(auction: Auction): AuctionState {
     return "ended";
   }
 
-  if (start !== null && Number.isFinite(start) && now < start) {
-    return "scheduled";
+  if (auction.status === "scheduled") {
+    if (start === null || !Number.isFinite(start) || now < start) {
+      return "scheduled";
+    }
   }
 
   return "live";
@@ -71,59 +70,66 @@ function getState(auction: Auction): AuctionState {
 
 function Status({ state }: { state: AuctionState }) {
   const styles = {
-    live: "bg-emerald-50 text-emerald-800 ring-emerald-700/15",
-    scheduled: "bg-amber-50 text-amber-800 ring-amber-700/15",
-    ended: "bg-stone-100 text-stone-600 ring-stone-500/15",
+    live: "border-red-400/30 bg-red-500/15 text-red-300",
+    scheduled: "border-amber-400/30 bg-amber-400/10 text-amber-300",
+    ended: "border-white/10 bg-white/5 text-white/50",
   };
 
   const labels = {
-    live: "● LIVE AUCTION",
+    live: "LELANG BERLANGSUNG",
     scheduled: "SEGERA DIMULAI",
-    ended: "LELANG BERAKHIR",
+    ended: "LELANG SELESAI",
   };
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-3 py-1.5 text-[10px] font-bold tracking-[0.12em] ring-1 ${styles[state]}`}
+      className={`inline-flex items-center gap-2 border px-3 py-2 text-[9px] font-bold tracking-[0.13em] ${styles[state]}`}
     >
+      {state === "live" && (
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />
+      )}
       {labels[state]}
     </span>
   );
 }
 
-function AuctionArtwork({
+function Artwork({
   src,
   title,
-  featured = false,
+  priority = false,
 }: {
   src: string | null;
   title: string;
-  featured?: boolean;
+  priority?: boolean;
 }) {
-  if (src) {
+  if (!src) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={src}
-        alt={title}
-        loading={featured ? "eager" : "lazy"}
-        className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]"
-      />
+      <div className="flex h-full w-full items-center justify-center bg-[#24241f]">
+        <div className="text-center">
+          <div className="text-5xl font-black tracking-[-0.1em] text-[#d9b567]">
+            TMD<span className="text-white">.</span>
+          </div>
+          <div className="mt-3 text-[9px] tracking-[0.35em] text-white/40">
+            AUCTION HOUSE
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="flex h-full min-h-48 items-center justify-center bg-[#eae5d9]">
-      <div className="text-center">
-        <div className="text-4xl font-black tracking-[-0.08em] text-[#aa8744]">
-          TMD
-        </div>
-        <div className="mt-2 text-[9px] tracking-[0.35em] text-stone-500">
-          WAR AUCTION HOUSE
-        </div>
-      </div>
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={title}
+      loading={priority ? "eager" : "lazy"}
+      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+    />
   );
+}
+
+function Arrow() {
+  return <span aria-hidden="true">↗</span>;
 }
 
 export default async function HomePage() {
@@ -152,157 +158,179 @@ export default async function HomePage() {
     items[0] ??
     null;
 
-  const others = items
-    .filter((item) => item.id !== featured?.id)
-    .slice(0, 6);
+  const others = items.filter((item) => item.id !== featured?.id).slice(0, 6);
 
   const liveCount = items.filter(
     (item) => item.displayState === "live"
   ).length;
 
+  const scheduledCount = items.filter(
+    (item) => item.displayState === "scheduled"
+  ).length;
+
   return (
-    <main className="min-h-screen bg-[#f8f7f3] text-[#201f1b]">
-      {/* Navigation */}
-      <header className="sticky top-0 z-40 border-b border-[#e8e4da] bg-[#f8f7f3]/95 backdrop-blur-xl">
-        <div className="mx-auto flex min-h-[76px] max-w-[1380px] items-center justify-between gap-4 px-5 sm:px-8 lg:px-12">
+    <main className="min-h-screen overflow-hidden bg-[#10110f] text-[#f6f4ee]">
+      {/* HEADER */}
+      <header className="sticky top-0 z-50 border-b border-white/[0.08] bg-[#10110f]/95 backdrop-blur-xl">
+        <div className="mx-auto flex h-[76px] max-w-[1440px] items-center justify-between gap-4 px-5 sm:px-8 lg:px-12">
           <Link href="/" className="flex shrink-0 items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center bg-[#25251f] text-lg font-black text-[#d7b66c]">
+            <div className="flex h-10 w-10 items-center justify-center bg-[#d9b567] text-xl font-black text-[#171711]">
               T
             </div>
             <div>
-              <div className="text-[18px] font-black tracking-[-0.06em] sm:text-xl">
-                TMD<span className="text-[#ae8740]">•</span>WAR
+              <div className="text-lg font-black tracking-[-0.07em]">
+                TMD<span className="text-[#d9b567]">•</span>WAR
               </div>
-              <div className="mt-0.5 text-[9px] font-medium tracking-[0.25em] text-stone-500">
+              <div className="mt-0.5 text-[8px] font-semibold tracking-[0.28em] text-white/40">
                 AUCTION HOUSE
               </div>
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-8 text-sm font-medium text-stone-600 md:flex">
-            <Link href="#lelang" className="transition hover:text-[#a47c31]">
-              Katalog
+          <nav className="hidden items-center gap-8 text-xs font-medium text-white/60 md:flex">
+            <Link href="/" className="text-[#d9b567]">
+              Beranda
             </Link>
-            <Link
-              href="#cara-kerja"
-              className="transition hover:text-[#a47c31]"
-            >
+            <Link href="#katalog" className="transition hover:text-white">
+              Katalog lelang
+            </Link>
+            <Link href="#panduan" className="transition hover:text-white">
               Cara kerja
             </Link>
           </nav>
 
           <Link
             href="/akun"
-            className="inline-flex items-center justify-center gap-2 bg-[#292920] px-4 py-3 text-xs font-bold text-white transition hover:bg-[#a47c31] sm:px-5 sm:text-sm"
+            className="inline-flex min-h-10 items-center gap-3 bg-[#d9b567] px-4 text-xs font-bold text-[#171711] transition hover:bg-[#f0d28d] sm:px-5"
           >
-            Masuk / Akun <span aria-hidden="true">↗</span>
+            Masuk / Akun <Arrow />
           </Link>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="mx-auto max-w-[1380px] px-5 pb-16 pt-12 sm:px-8 sm:pt-16 lg:px-12 lg:pb-24 lg:pt-24">
-        <div className="grid items-center gap-12 lg:grid-cols-[0.92fr_1.08fr] lg:gap-16">
-          <div className="max-w-2xl">
+      {/* HERO */}
+      <section className="relative border-b border-white/[0.08]">
+        <div className="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full bg-[#b58d3e]/[0.07] blur-[100px]" />
+
+        <div className="relative mx-auto grid max-w-[1440px] items-center gap-10 px-5 py-12 sm:px-8 sm:py-16 lg:grid-cols-[0.9fr_1.1fr] lg:gap-14 lg:px-12 lg:py-20">
+          <div>
             <div className="mb-7 flex items-center gap-3">
-              <span className="h-px w-10 bg-[#ae8740]" />
-              <span className="text-[10px] font-bold tracking-[0.25em] text-[#94712f]">
-                THE ART OF WINNING
+              <span className="h-px w-9 bg-[#d9b567]" />
+              <span className="text-[10px] font-bold tracking-[0.25em] text-[#d9b567]">
+                TEMUKAN. TAWAR. MENANG.
               </span>
             </div>
 
-            <h1 className="text-[46px] font-semibold leading-[1.02] tracking-[-0.065em] sm:text-6xl lg:text-[76px]">
-              Barang istimewa.
+            <h1 className="max-w-2xl text-[48px] font-black leading-[0.99] tracking-[-0.07em] sm:text-6xl lg:text-[76px]">
+              Bukan sekadar
               <br />
-              <span className="font-serif italic font-normal text-[#a6813d]">
-                Kesempatanmu.
-              </span>
+              <span className="text-[#d9b567]">membeli.</span>
+              <br />
+              Menangkan.
             </h1>
 
-            <p className="mt-7 max-w-lg text-sm leading-7 text-stone-600 sm:text-base sm:leading-8">
-              Temukan barang pilihan, ikuti persaingan penawaran, dan
-              menangkan barang incaranmu melalui pengalaman lelang yang
-              lebih transparan bersama TMD-WAR.
+            <p className="mt-7 max-w-md text-sm leading-7 text-white/55 sm:text-base sm:leading-8">
+              Berburu barang pilihan. Ajukan penawaran terbaik. Jadilah
+              pemilik berikutnya melalui pengalaman lelang TMD-WAR.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href="#lelang"
-                className="inline-flex min-h-12 items-center justify-center gap-5 bg-[#292920] px-6 text-sm font-bold text-white transition hover:bg-[#a6813d]"
+                href="#katalog"
+                className="inline-flex min-h-12 items-center gap-5 bg-[#d9b567] px-6 text-sm font-bold text-[#171711] transition hover:bg-[#f0d28d]"
               >
-                Jelajahi katalog <span>↗</span>
+                Jelajahi lelang <Arrow />
               </Link>
               <Link
-                href="#cara-kerja"
-                className="inline-flex min-h-12 items-center justify-center border border-[#d9d4c9] px-6 text-sm font-semibold transition hover:border-[#a6813d]"
+                href="#panduan"
+                className="inline-flex min-h-12 items-center border border-white/15 px-5 text-sm font-semibold text-white/80 transition hover:border-[#d9b567]/60 hover:text-white"
               >
-                Cara mengikuti lelang
+                Cara mengikuti
               </Link>
             </div>
 
-            <div className="mt-12 grid max-w-md grid-cols-2 border-t border-[#ded9ce] pt-6">
-              <div className="border-r border-[#ded9ce] pr-6">
-                <div className="text-3xl font-semibold tracking-tight">
-                  {items.length.toString().padStart(2, "0")}
+            <div className="mt-12 grid max-w-md grid-cols-3 border-t border-white/10 pt-6">
+              <div className="border-r border-white/10 pr-3">
+                <div className="text-2xl font-bold tracking-tight sm:text-3xl">
+                  {String(items.length).padStart(2, "0")}
                 </div>
-                <p className="mt-2 text-xs text-stone-500">
-                  Barang dalam katalog
+                <p className="mt-2 text-[10px] leading-4 text-white/40 sm:text-xs">
+                  Barang tersedia
                 </p>
               </div>
-              <div className="pl-6">
-                <div className="text-3xl font-semibold tracking-tight">
-                  {liveCount.toString().padStart(2, "0")}
+              <div className="border-r border-white/10 px-3">
+                <div className="text-2xl font-bold tracking-tight sm:text-3xl">
+                  {String(liveCount).padStart(2, "0")}
                 </div>
-                <p className="mt-2 text-xs text-stone-500">
-                  Lelang berlangsung
+                <p className="mt-2 text-[10px] leading-4 text-white/40 sm:text-xs">
+                  Sedang live
+                </p>
+              </div>
+              <div className="pl-3">
+                <div className="text-2xl font-bold tracking-tight sm:text-3xl">
+                  {String(scheduledCount).padStart(2, "0")}
+                </div>
+                <p className="mt-2 text-[10px] leading-4 text-white/40 sm:text-xs">
+                  Akan datang
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Featured item */}
-          <div className="relative">
-            <div className="absolute -right-5 -top-5 hidden h-32 w-32 border-r border-t border-[#d4bd88] sm:block" />
+          {/* FEATURED AUCTION */}
+          <div className="relative min-w-0">
+            <div className="absolute -right-3 -top-3 z-10 hidden h-20 w-20 border-r border-t border-[#d9b567]/50 sm:block" />
 
             {featured ? (
-              <article className="group relative bg-white p-2 shadow-[0_24px_80px_rgba(42,36,23,0.09)] sm:p-3">
-                <div className="relative aspect-[5/4] overflow-hidden bg-[#eae5d9]">
-                  <AuctionArtwork
+              <article className="group relative border border-white/10 bg-[#191a16] p-2 sm:p-3">
+                <div className="relative aspect-[5/4] overflow-hidden bg-[#24241f] sm:aspect-[1.12/1]">
+                  <Artwork
                     src={featured.image_url}
                     title={featured.title}
-                    featured
+                    priority
                   />
-                  <div className="absolute left-4 top-4 sm:left-6 sm:top-6">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent" />
+
+                  <div className="absolute left-4 top-4 sm:left-5 sm:top-5">
                     <Status state={featured.displayState} />
                   </div>
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent p-5 pt-20 text-white sm:p-8 sm:pt-24">
-                    <p className="text-[9px] font-bold tracking-[0.25em] text-[#e6c982]">
-                      PILIHAN TMD-WAR
+
+                  <div className="absolute right-4 top-4 border border-white/20 bg-black/30 px-3 py-2 text-[9px] font-semibold tracking-[0.18em] text-white/80 backdrop-blur-sm">
+                    FEATURED LOT
+                  </div>
+
+                  <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7">
+                    <p className="text-[9px] font-bold tracking-[0.25em] text-[#d9b567]">
+                      PILIHAN MINGGU INI
                     </p>
-                    <h2 className="mt-2 line-clamp-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+                    <h2 className="mt-3 line-clamp-2 max-w-xl text-2xl font-bold leading-tight tracking-[-0.04em] sm:text-3xl">
                       {featured.title}
                     </h2>
-                    <p className="mt-2 line-clamp-2 max-w-lg text-xs leading-6 text-white/75 sm:text-sm">
+                    <p className="mt-3 line-clamp-2 max-w-lg text-xs leading-6 text-white/60 sm:text-sm">
                       {featured.description ||
-                        "Lihat informasi barang, harga, dan jadwal lelang."}
+                        "Buka detail untuk melihat informasi lengkap barang lelang."}
                     </p>
                   </div>
                 </div>
 
-                <div className="grid gap-5 px-3 py-5 sm:grid-cols-[1fr_auto] sm:items-end sm:px-5 sm:py-6">
+                <div className="grid gap-4 px-3 py-5 sm:grid-cols-[1fr_auto] sm:items-center sm:px-4">
                   <div>
-                    <p className="text-[10px] font-semibold tracking-[0.16em] text-stone-500">
-                      HARGA SAAT INI
+                    <p className="text-[9px] font-bold tracking-[0.17em] text-white/40">
+                      {featured.displayState === "scheduled"
+                        ? "HARGA AWAL"
+                        : "HARGA SAAT INI"}
                     </p>
-                    <p className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">
+                    <p className="mt-2 break-words text-xl font-bold tracking-tight text-[#e6c87f] sm:text-2xl">
                       {rupiah(
-                        featured.current_price ?? featured.starting_price
+                        featured.displayState === "scheduled"
+                          ? featured.starting_price
+                          : featured.current_price ?? featured.starting_price
                       )}
                     </p>
-                    <p className="mt-2 text-xs leading-5 text-stone-500">
+                    <p className="mt-2 text-[10px] leading-5 text-white/45">
                       {featured.displayState === "scheduled"
-                        ? "Dimulai "
-                        : "Berakhir "}
+                        ? "Mulai "
+                        : "Batas waktu "}
                       {dateWIB(
                         featured.displayState === "scheduled"
                           ? featured.starts_at
@@ -313,281 +341,322 @@ export default async function HomePage() {
 
                   <Link
                     href={`/lelang/${featured.id}`}
-                    className="inline-flex min-h-12 items-center justify-center gap-5 bg-[#b08b46] px-5 text-sm font-bold text-white transition hover:bg-[#292920]"
+                    className="inline-flex min-h-12 items-center justify-center gap-5 bg-[#d9b567] px-5 text-sm font-bold text-[#171711] transition hover:bg-[#f0d28d]"
                   >
-                    Lihat barang <span>↗</span>
+                    Lihat lelang <Arrow />
                   </Link>
                 </div>
               </article>
             ) : (
-              <div className="flex min-h-[340px] flex-col items-center justify-center border border-[#e5dfd3] bg-white p-8 text-center sm:min-h-[440px]">
-                <div className="font-serif text-5xl italic text-[#b08b46]">
-                  TMD
+              <div className="flex min-h-[360px] flex-col items-center justify-center border border-white/10 bg-[#191a16] p-8 text-center sm:min-h-[480px]">
+                <div className="text-5xl font-black tracking-[-0.1em] text-[#d9b567]">
+                  TMD.
                 </div>
-                <h2 className="mt-5 text-xl font-semibold">
-                  Koleksi berikutnya segera hadir
+                <p className="mt-4 text-[9px] font-bold tracking-[0.3em] text-white/40">
+                  THE AUCTION HOUSE
+                </p>
+                <h2 className="mt-7 text-xl font-bold">
+                  Arena lelang segera dibuka
                 </h2>
-                <p className="mt-3 max-w-sm text-sm leading-7 text-stone-500">
-                  Belum ada lelang yang tersedia saat ini. Silakan kembali
-                  untuk melihat barang pilihan terbaru.
+                <p className="mt-3 max-w-sm text-sm leading-7 text-white/45">
+                  Belum ada barang yang tersedia. Kembali lagi untuk
+                  menemukan koleksi berikutnya.
                 </p>
               </div>
             )}
 
-            <div className="absolute -bottom-5 -left-5 hidden h-24 w-24 border-b border-l border-[#d4bd88] sm:block" />
+            <div className="absolute -bottom-3 -left-3 hidden h-16 w-16 border-b border-l border-[#d9b567]/50 sm:block" />
           </div>
         </div>
       </section>
 
-      {/* Catalog */}
-      <section
-        id="lelang"
-        className="scroll-mt-24 border-y border-[#e8e3d8] bg-white"
-      >
-        <div className="mx-auto max-w-[1380px] px-5 py-16 sm:px-8 sm:py-20 lg:px-12 lg:py-24">
-          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+      {/* TRUST STRIP */}
+      <section className="border-b border-white/[0.08] bg-[#171813]">
+        <div className="mx-auto grid max-w-[1440px] grid-cols-1 gap-4 px-5 py-5 sm:grid-cols-3 sm:px-8 lg:px-12">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-[#d9b567]/25 text-[#d9b567]">
+              ◈
+            </span>
             <div>
-              <div className="mb-4 flex items-center gap-3">
-                <span className="h-px w-8 bg-[#ae8740]" />
-                <span className="text-[10px] font-bold tracking-[0.25em] text-[#94712f]">
-                  THE COLLECTION
-                </span>
-              </div>
-              <h2 className="text-3xl font-semibold tracking-[-0.05em] sm:text-5xl">
-                Jelajahi katalog
+              <p className="text-xs font-bold">Harga transparan</p>
+              <p className="mt-1 text-[10px] text-white/40">
+                Harga ditampilkan secara jelas
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 border-white/10 sm:border-l sm:pl-5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-[#d9b567]/25 text-[#d9b567]">
+              ↗
+            </span>
+            <div>
+              <p className="text-xs font-bold">Penawaran terverifikasi</p>
+              <p className="mt-1 text-[10px] text-white/40">
+                Login diperlukan untuk menawar
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 border-white/10 sm:border-l sm:pl-5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-[#d9b567]/25 text-[#d9b567]">
+              ◷
+            </span>
+            <div>
+              <p className="text-xs font-bold">Jadwal yang jelas</p>
+              <p className="mt-1 text-[10px] text-white/40">
+                Pantau waktu mulai dan berakhir
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CATALOG */}
+      <section id="katalog" className="scroll-mt-24">
+        <div className="mx-auto max-w-[1440px] px-5 py-16 sm:px-8 sm:py-20 lg:px-12 lg:py-24">
+          <div className="flex flex-col justify-between gap-5 border-b border-white/10 pb-7 sm:flex-row sm:items-end">
+            <div>
+              <p className="text-[10px] font-bold tracking-[0.25em] text-[#d9b567]">
+                EXPLORE THE COLLECTION
+              </p>
+              <h2 className="mt-4 text-3xl font-black tracking-[-0.055em] sm:text-5xl">
+                Katalog <span className="text-[#d9b567]">lelang.</span>
               </h2>
-              <p className="mt-4 max-w-xl text-sm leading-7 text-stone-500">
-                Setiap barang memiliki cerita. Temukan yang sesuai dengan
-                minatmu dan ikuti jadwal lelangnya.
+              <p className="mt-4 max-w-xl text-sm leading-7 text-white/45">
+                Temukan barang incaranmu, cek harga terbaru, dan ikuti
+                lelang sesuai jadwal.
               </p>
             </div>
 
-            <p className="text-xs text-stone-500">
-              Menampilkan{" "}
-              <span className="font-bold text-[#292920]">
-                {items.length}
+            <div className="text-xs text-white/40">
+              TOTAL{" "}
+              <span className="ml-1 font-bold text-[#d9b567]">
+                {String(items.length).padStart(2, "0")}
               </span>{" "}
-              barang
-            </p>
+              LOT
+            </div>
           </div>
 
           {error ? (
-            <div className="mt-10 border border-red-200 bg-red-50 p-6">
-              <h3 className="font-semibold text-red-800">
+            <div className="mt-8 border border-red-400/20 bg-red-400/5 p-6">
+              <p className="font-bold text-red-300">
                 Katalog belum dapat dimuat
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-red-700">
-                Terjadi kendala saat mengambil data lelang. Silakan coba
-                kembali beberapa saat lagi.
+              </p>
+              <p className="mt-2 text-sm leading-6 text-white/50">
+                Terjadi kendala saat mengambil data. Silakan coba kembali
+                beberapa saat lagi.
               </p>
             </div>
           ) : others.length > 0 ? (
-            <div className="mt-10 grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-8 grid gap-x-5 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
               {others.map((auction, index) => (
-                <article key={auction.id} className="group min-w-0">
+                <article
+                  key={auction.id}
+                  className="group min-w-0 border border-white/[0.09] bg-[#171813] transition duration-300 hover:border-[#d9b567]/40"
+                >
                   <Link
                     href={`/lelang/${auction.id}`}
                     className="block"
                     aria-label={`Lihat lelang ${auction.title}`}
                   >
-                    <div className="relative aspect-[4/3] overflow-hidden bg-[#ece8df]">
-                      <AuctionArtwork
+                    <div className="relative aspect-[4/3] overflow-hidden bg-[#24241f]">
+                      <Artwork
                         src={auction.image_url}
                         title={auction.title}
                       />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+
                       <div className="absolute left-3 top-3">
                         <Status state={auction.displayState} />
                       </div>
-                      <div className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg text-[#292920] opacity-0 shadow-lg transition group-hover:opacity-100">
-                        ↗
+
+                      <div className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center bg-[#d9b567] text-lg font-bold text-[#171711] transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
+                        <Arrow />
                       </div>
                     </div>
 
-                    <div className="pb-1 pt-5">
+                    <div className="p-5">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-[9px] font-bold tracking-[0.2em] text-[#9b783a]">
+                        <span className="text-[9px] font-bold tracking-[0.18em] text-[#d9b567]">
                           {auction.auction_mode === "live"
                             ? "LIVE AUCTION"
                             : "TIMED AUCTION"}
                         </span>
-                        <span className="text-[10px] text-stone-400">
+                        <span className="text-[9px] tracking-[0.12em] text-white/30">
                           LOT {String(index + 1).padStart(3, "0")}
                         </span>
                       </div>
 
-                      <h3 className="mt-3 line-clamp-2 min-h-[3.5rem] text-xl font-semibold leading-7 tracking-tight transition group-hover:text-[#9b783a]">
+                      <h3 className="mt-4 line-clamp-2 min-h-[3.5rem] text-lg font-bold leading-7 tracking-[-0.025em] transition group-hover:text-[#e6c87f]">
                         {auction.title}
                       </h3>
 
-                      <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-stone-500">
+                      <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-white/40">
                         {auction.description ||
-                          "Buka detail untuk melihat informasi lengkap barang."}
+                          "Lihat detail barang dan ketentuan lelang."}
                       </p>
 
-                      <div className="mt-5 flex items-end justify-between gap-3 border-t border-[#e8e3d8] pt-4">
-                        <div className="min-w-0">
-                          <p className="text-[9px] font-semibold tracking-[0.15em] text-stone-500">
-                            HARGA SAAT INI
-                          </p>
-                          <p className="mt-1 break-words text-lg font-semibold tracking-tight">
-                            {rupiah(
-                              auction.current_price ?? auction.starting_price
+                      <div className="mt-5 border-t border-white/10 pt-4">
+                        <p className="text-[9px] font-bold tracking-[0.15em] text-white/35">
+                          {auction.displayState === "scheduled"
+                            ? "HARGA AWAL"
+                            : "HARGA SAAT INI"}
+                        </p>
+                        <p className="mt-2 break-words text-xl font-bold tracking-tight text-[#e6c87f]">
+                          {rupiah(
+                            auction.displayState === "scheduled"
+                              ? auction.starting_price
+                              : auction.current_price ?? auction.starting_price
+                          )}
+                        </p>
+
+                        <div className="mt-4 flex items-start gap-2 text-[10px] leading-5 text-white/40">
+                          <span className="text-[#d9b567]">◷</span>
+                          <span>
+                            {auction.displayState === "scheduled"
+                              ? "Mulai: "
+                              : "Batas: "}
+                            {dateWIB(
+                              auction.displayState === "scheduled"
+                                ? auction.starts_at
+                                : auction.ends_at
                             )}
-                          </p>
+                          </span>
                         </div>
-                        <span className="shrink-0 pb-1 text-xs font-semibold text-[#9b783a]">
-                          Lihat detail ↗
-                        </span>
-                      </div>
 
-                      <p className="mt-3 text-[11px] leading-5 text-stone-500">
-                        {auction.displayState === "scheduled"
-                          ? "Mulai: "
-                          : "Batas: "}
-                        {dateWIB(
-                          auction.displayState === "scheduled"
-                            ? auction.starts_at
-                            : auction.ends_at
-                        )}
-                      </p>
+                        <div className="mt-5 flex items-center justify-between border-t border-white/[0.06] pt-4 text-xs font-bold">
+                          <span className="text-white/65">
+                            Lihat detail
+                          </span>
+                          <span className="text-[#d9b567] transition group-hover:translate-x-1">
+                            →
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </Link>
                 </article>
               ))}
             </div>
           ) : items.length === 0 ? (
-            <div className="mt-10 border border-dashed border-[#dcd5c8] px-6 py-16 text-center">
-              <div className="font-serif text-5xl italic text-[#b08b46]">
-                TMD
+            <div className="mt-8 border border-dashed border-white/15 bg-[#171813] px-6 py-16 text-center">
+              <div className="text-5xl font-black tracking-[-0.1em] text-[#d9b567]">
+                TMD.
               </div>
-              <h3 className="mt-5 text-xl font-semibold">
-                Katalog sedang dipersiapkan
+              <h3 className="mt-6 text-xl font-bold">
+                Koleksi sedang dipersiapkan
               </h3>
-              <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-stone-500">
-                Barang lelang akan muncul di halaman ini setelah admin
+              <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-white/45">
+                Barang lelang akan ditampilkan di sini setelah admin
                 menerbitkan lelang.
               </p>
               <Link
                 href="/akun"
-                className="mt-6 inline-flex min-h-11 items-center justify-center bg-[#292920] px-5 text-sm font-semibold text-white transition hover:bg-[#a6813d]"
+                className="mt-6 inline-flex min-h-11 items-center gap-3 bg-[#d9b567] px-5 text-sm font-bold text-[#171711] transition hover:bg-[#f0d28d]"
               >
-                Buka akun <span className="ml-3">↗</span>
+                Buka akun <Arrow />
               </Link>
             </div>
           ) : (
-            <p className="mt-10 border-t border-[#e8e3d8] py-8 text-sm text-stone-500">
-              Semua barang yang tersedia sudah ditampilkan di bagian
-              unggulan.
-            </p>
+            <div className="mt-8 border border-white/10 p-6 text-sm text-white/45">
+              Barang lainnya akan ditampilkan di sini.
+            </div>
           )}
         </div>
       </section>
 
-      {/* How it works */}
+      {/* GUIDE */}
       <section
-        id="cara-kerja"
-        className="scroll-mt-24 bg-[#eeece5] py-16 sm:py-24"
+        id="panduan"
+        className="scroll-mt-24 border-t border-white/10 bg-[#171813]"
       >
-        <div className="mx-auto max-w-[1380px] px-5 sm:px-8 lg:px-12">
-          <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
-            <div>
-              <div className="mb-4 flex items-center gap-3">
-                <span className="h-px w-8 bg-[#ae8740]" />
-                <span className="text-[10px] font-bold tracking-[0.25em] text-[#94712f]">
-                  HOW IT WORKS
-                </span>
-              </div>
-              <h2 className="max-w-md text-3xl font-semibold leading-tight tracking-[-0.05em] sm:text-5xl">
-                Cara mengikuti lelang.
-              </h2>
-              <p className="mt-5 max-w-md text-sm leading-7 text-stone-600">
-                Proses sederhana untuk menemukan barang, mengajukan
-                penawaran, dan mengikuti perkembangan lelang.
-              </p>
-              <Link
-                href="#lelang"
-                className="mt-7 inline-flex min-h-12 items-center gap-5 bg-[#292920] px-6 text-sm font-bold text-white transition hover:bg-[#a6813d]"
+        <div className="mx-auto grid max-w-[1440px] gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20 lg:px-12 lg:py-24">
+          <div>
+            <p className="text-[10px] font-bold tracking-[0.25em] text-[#d9b567]">
+              HOW IT WORKS
+            </p>
+            <h2 className="mt-5 max-w-md text-3xl font-black leading-tight tracking-[-0.055em] sm:text-5xl">
+              Satu barang.
+              <br />
+              <span className="text-[#d9b567]">Satu kesempatan.</span>
+            </h2>
+            <p className="mt-5 max-w-md text-sm leading-7 text-white/45">
+              Mulai dari menemukan barang hingga mengajukan penawaran.
+              Semua dimulai dari katalog TMD-WAR.
+            </p>
+            <Link
+              href="#katalog"
+              className="mt-7 inline-flex min-h-12 items-center gap-5 bg-[#d9b567] px-6 text-sm font-bold text-[#171711] transition hover:bg-[#f0d28d]"
+            >
+              Mulai jelajahi <Arrow />
+            </Link>
+          </div>
+
+          <div className="divide-y divide-white/10 border-y border-white/10">
+            {[
+              {
+                number: "01",
+                title: "Pilih barang incaran",
+                description:
+                  "Buka katalog, pelajari deskripsi, harga, dan jadwal lelang.",
+              },
+              {
+                number: "02",
+                title: "Login dan ajukan penawaran",
+                description:
+                  "Masuk menggunakan Facebook dan ajukan bid sesuai ketentuan lelang.",
+              },
+              {
+                number: "03",
+                title: "Pantau sampai selesai",
+                description:
+                  "Periksa harga terbaru dan waktu berakhir melalui halaman detail lelang.",
+              },
+            ].map((step) => (
+              <div
+                key={step.number}
+                className="grid grid-cols-[52px_1fr] gap-4 py-6 sm:grid-cols-[68px_1fr] sm:gap-6 sm:py-8"
               >
-                Lihat katalog <span>↗</span>
-              </Link>
-            </div>
-
-            <div className="divide-y divide-[#d9d4c8] border-y border-[#d9d4c8]">
-              <div className="grid grid-cols-[54px_1fr] gap-4 py-6 sm:grid-cols-[72px_1fr] sm:gap-6 sm:py-8">
-                <span className="font-serif text-3xl italic text-[#ae8740] sm:text-4xl">
-                  01
+                <span className="text-2xl font-black tracking-[-0.06em] text-[#d9b567] sm:text-3xl">
+                  {step.number}
                 </span>
                 <div>
-                  <h3 className="text-lg font-semibold">Temukan barang</h3>
-                  <p className="mt-2 text-sm leading-7 text-stone-600">
-                    Jelajahi katalog, pelajari deskripsi barang, dan
-                    periksa harga serta jadwal lelang.
+                  <h3 className="text-lg font-bold">{step.title}</h3>
+                  <p className="mt-2 text-xs leading-6 text-white/45 sm:text-sm">
+                    {step.description}
                   </p>
                 </div>
               </div>
-
-              <div className="grid grid-cols-[54px_1fr] gap-4 py-6 sm:grid-cols-[72px_1fr] sm:gap-6 sm:py-8">
-                <span className="font-serif text-3xl italic text-[#ae8740] sm:text-4xl">
-                  02
-                </span>
-                <div>
-                  <h3 className="text-lg font-semibold">
-                    Login dan menawar
-                  </h3>
-                  <p className="mt-2 text-sm leading-7 text-stone-600">
-                    Masuk menggunakan Facebook dan ajukan penawaran sesuai
-                    dengan ketentuan serta kenaikan minimum.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-[54px_1fr] gap-4 py-6 sm:grid-cols-[72px_1fr] sm:gap-6 sm:py-8">
-                <span className="font-serif text-3xl italic text-[#ae8740] sm:text-4xl">
-                  03
-                </span>
-                <div>
-                  <h3 className="text-lg font-semibold">
-                    Pantau perkembangan
-                  </h3>
-                  <p className="mt-2 text-sm leading-7 text-stone-600">
-                    Periksa harga terbaru dan status lelang melalui halaman
-                    detail barang.
-                  </p>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-[#292920] text-white">
-        <div className="mx-auto flex max-w-[1380px] flex-col gap-8 px-5 py-10 sm:px-8 md:flex-row md:items-center md:justify-between lg:px-12">
+      {/* FOOTER */}
+      <footer className="border-t border-white/[0.08] bg-[#0b0c0a]">
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-5 py-8 sm:px-8 md:flex-row md:items-center md:justify-between lg:px-12">
           <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center bg-[#b08b46] font-black text-white">
+            <div className="flex h-9 w-9 items-center justify-center bg-[#d9b567] font-black text-[#171711]">
               T
             </div>
             <div>
-              <div className="text-lg font-black tracking-[-0.05em]">
-                TMD<span className="text-[#d7b66c]">•</span>WAR
+              <div className="text-base font-black tracking-[-0.06em]">
+                TMD<span className="text-[#d9b567]">•</span>WAR
               </div>
-              <div className="mt-0.5 text-[9px] tracking-[0.25em] text-white/50">
+              <div className="mt-0.5 text-[8px] tracking-[0.25em] text-white/35">
                 AUCTION HOUSE
               </div>
             </div>
           </Link>
 
-          <p className="text-xs leading-6 text-white/50">
-            © {new Date().getFullYear()} TMD-WAR Auction House.
-            <br className="sm:hidden" /> Semua hak dilindungi.
+          <p className="text-[10px] leading-6 text-white/35">
+            © {new Date().getFullYear()} TMD-WAR. Hak cipta dilindungi.
           </p>
 
-          <div className="flex gap-6 text-xs text-white/70">
-            <Link href="#lelang" className="transition hover:text-[#d7b66c]">
+          <div className="flex gap-5 text-xs text-white/50">
+            <Link href="#katalog" className="transition hover:text-[#d9b567]">
               Katalog
             </Link>
-            <Link href="/akun" className="transition hover:text-[#d7b66c]">
-              Akun pengguna
+            <Link href="/akun" className="transition hover:text-[#d9b567]">
+              Akun
             </Link>
           </div>
         </div>
