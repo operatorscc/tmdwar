@@ -1,4 +1,3 @@
-
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -6,8 +5,17 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "https://gttrrgwbxuijcenagaha.supabase.co",
+        hostname: "gttrrgwbxuijcenagaha.supabase.co",
         pathname: "/storage/v1/object/public/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
       },
     ],
   },

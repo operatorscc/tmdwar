@@ -1,33 +1,116 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { rupiah } from "@/lib/money";
-import BidForm from "./bid-form";
+import { type Auction } from "@/lib/auction";
+import { AuctionLiveView, type BidRecord } from "./auction-live-view";
 
-export default async function AuctionDetail({ params }: { params: Promise<{id:string}> }) {
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  try {
+    const supabase = await createClient();
+    const { data: auction } = await supabase
+      .from("auctions")
+      .select("title, description")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (auction) {
+      return {
+        title: `${auction.title} — TMD-WAR Lelang`,
+        description: auction.description || "Lihat detail lot dan ajukan penawaran di TMD-WAR.",
+      };
+    }
+  } catch {
+    // fallback
+  }
+
+  return {
+    title: "Detail Lot Lelang — TMD-WAR",
+  };
+}
+
+interface RawBidData {
+  id: number;
+  amount: number;
+  created_at: string;
+  profiles: { display_name: string | null } | { display_name: string | null }[] | null;
+}
+
+export default async function AuctionDetailPage({ params }: PageProps) {
   const { id } = await params;
   const supabase = await createClient();
-  const { data:a } = await supabase.from("auctions").select("*").eq("id",id).maybeSingle();
-  if (!a || !["scheduled","live","ended","cancelled"].includes(a.status)) notFound();
-  const { data:{user} } = await supabase.auth.getUser();
-  const { data:bids } = await supabase.from("bids").select("id,amount,created_at,profiles(display_name)").eq("auction_id",id).order("amount",{ascending:false}).limit(10);
-  const now = new Date();
-  const statusLabel = a.status==="live" ? "Sedang berlangsung" : a.status==="scheduled" ? "Akan dimulai" : a.status==="ended" ? "Selesai" : "Dibatalkan";
-  const canBid = !!user && a.status==="live" && new Date(a.starts_at)<=now && new Date(a.ends_at)>now;
-  return <div className="container"><div style={{paddingTop:24}}><Link className="muted" href="/">← Kembali ke katalog</Link></div>
-    <div className="detail"><div>{a.image_url ? <img className="product-image" src={a.image_url} alt={a.title}/> : <div className="product-image" style={{borderRadius:22}}>Foto barang belum tersedia</div>}</div>
-      <div><span className={`pill ${a.auction_mode==="live"?"live":""}`}>{a.auction_mode==="live"?"Lelang live":"Lelang berbatas waktu"}</span> <span className="muted" style={{fontSize:13,marginLeft:8}}>{statusLabel}</span>
-        <h1>{a.title}</h1><p className="muted" style={{lineHeight:1.8,whiteSpace:"pre-wrap"}}>{a.description || "Tidak ada deskripsi tambahan."}</p>
-        <div className="panel" style={{marginTop:22}}><div className="muted" style={{fontSize:13}}>Penawaran tertinggi saat ini</div><div style={{fontSize:32,fontWeight:900,margin:"7px 0 14px"}}>{rupiah(a.current_price)}</div>
-          <div className="meta"><span>Harga awal: {rupiah(a.starting_price)}</span><span>Min. kenaikan: {rupiah(a.min_increment)}</span></div>
-          <hr style={{border:0,borderTop:"1px solid var(--line)",margin:"18px 0"}}/>
-          <div className="field"><label>Mulai</label><div>{new Date(a.starts_at).toLocaleString("id-ID")}</div></div><div className="field"><label>Berakhir</label><div>{new Date(a.ends_at).toLocaleString("id-ID")}</div></div>
-          {canBid ? <BidForm auctionId={a.id} currentPrice={Number(a.current_price)} minIncrement={Number(a.min_increment)} /> : !user ? <div style={{marginTop:18}}><Link className="btn" href={`/login?next=${encodeURIComponent(`/lelang/${a.id}`)}`}>Login Facebook untuk menawar</Link></div> : <p className="muted" style={{marginTop:18}}>Penawaran belum dibuka atau lelang sudah berakhir.</p>}
-        </div>
-      </div>
+
+  const { data: auctionData, error: auctionError } = await supabase
+    .from("auctions")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (auctionError || !auctionData) {
+    notFound();
+  }
+
+  const auction = auctionData as unknown as Auction;
+  if (!["scheduled", "live", "ended", "cancelled"].includes(auction.status)) {
+    notFound();
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: bidsData } = await supabase
+    .from("bids")
+    .select("id, amount, created_at, profiles(display_name)")
+    .eq("auction_id", id)
+    .order("amount", { ascending: false })
+    .limit(20);
+
+  const rawBids = (bidsData ?? []) as unknown as RawBidData[];
+
+  const initialBids: BidRecord[] = rawBids.map((b) => {
+    let name = "Peserta";
+    if (b.profiles) {
+      if (Array.isArray(b.profiles)) {
+        name = b.profiles[0]?.display_name || "Peserta";
+      } else {
+        name = b.profiles.display_name || "Peserta";
+      }
+    }
+    return {
+      id: b.id,
+      amount: b.amount,
+      created_at: b.created_at,
+      bidder_name: name,
+    };
+  });
+
+  const userSummary = user ? { id: user.id, email: user.email } : null;
+
+  return (
+    <div className="app-container" style={{ paddingTop: 28 }}>
+      {/* Breadcrumb / Back button */}
+      <nav aria-label="Breadcrumb" style={{ marginBottom: 16 }}>
+        <Link
+          href="/#katalog"
+          className="btn-secondary"
+          style={{ padding: "8px 14px", fontSize: 12, display: "inline-flex", gap: 6 }}
+        >
+          <span>←</span>
+          <span>Kembali ke Katalog Lelang</span>
+        </Link>
+      </nav>
+
+      <AuctionLiveView
+        initialAuction={auction}
+        initialBids={initialBids}
+        user={userSummary}
+      />
     </div>
-    <section style={{paddingBottom:60}}><div className="section-head"><div><h2>Penawaran terbaru</h2><p>Menampilkan maksimal 10 penawaran tertinggi.</p></div></div>
-      {bids?.length ? <div className="panel">{bids.map((b:any)=><div key={b.id} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"13px 0",borderBottom:"1px solid var(--line)"}}><div><strong>{b.profiles?.display_name || "Peserta"}</strong><div className="muted" style={{fontSize:12,marginTop:4}}>{new Date(b.created_at).toLocaleString("id-ID")}</div></div><strong>{rupiah(b.amount)}</strong></div>)}</div> : <div className="empty">Belum ada penawaran. Jadilah penawar pertama.</div>}
-    </section>
-  </div>;
+  );
 }

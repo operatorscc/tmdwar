@@ -1,88 +1,156 @@
-<<<<<<< HEAD
-# TMD-WAR — Starter aplikasi lelang online
+# TMD-WAR — Platform Lelang Online & House of Curated Auctions
 
-Starter MVP Next.js App Router + Supabase + Facebook OAuth. Publik dapat melihat lelang, login diperlukan untuk menawar, dan hanya admin dapat mengelola barang melalui SQL/RLS.
+Platform lelang daring modern berbasis **Next.js 15 (App Router, React 19, TypeScript)** dan **Supabase (PostgreSQL, Supabase Auth, RLS, Realtime)** dengan sistem desain premium terinspirasi **Framer Websites**.
 
-## Yang sudah ada
-- Responsive landing/catalog/detail/account/login UI
-- Supabase SSR client (cookie-based) + middleware token refresh
-- Facebook OAuth start + callback + sign out
-- PostgreSQL schema untuk profiles, auctions, bids
-- RLS, role admin/bidder, fungsi RPC `place_bid` yang mengunci baris lelang untuk mencegah dua bid bersamaan lolos pada harga yang sama
-- Mode `timed` dan `live` sebagai jenis lelang; keduanya memakai `starts_at` dan `ends_at`
-- Riwayat bid pada halaman detail
+---
 
-## Prasyarat
-- Node.js 20+
-- Project Supabase
-- Facebook Developer app
-- Akun GitHub (untuk deployment Vercel)
+## Fitur Utama
 
-## 1. Jalankan lokal
+- **Desain Modern Terinspirasi Framer:** Palet obsidian gelap (`#0A0B0D`), aksen emas sampanye (`#D4AF37`), tipografi presisi dengan angka tabular (`tabular-nums`), mikro-interaksi responsif, dan dukungan `prefers-reduced-motion`.
+- **Katalog Interaktif Real-time:** Filter tab dinamis (*Semua*, *Sedang Live*, *Segera Dimulai*, *Selesai*), pencarian lot instan, dan kartu lot dengan preview detail.
+- **Hitung Mundur Presisi (Countdown):** Komponen hitung mundur detil per detik untuk waktu penutupan lot live dan waktu pembukaan lelang terjadwal.
+- **Penawaran Terkunci Tingkat Baris (Row-Level Locking):** Prosedur tersimpan PostgreSQL `place_bid` dengan `SELECT ... FOR UPDATE` untuk mencegah race condition atau double-bid pada harga yang sama.
+- **Langganan Real-time Supabase:** Halaman detail lelang mendengarkan perubahan harga dan bid baru secara langsung melalui WebSockets tanpa perlu reload browser.
+- **Formulir Penawaran Cepat (Quick-Bid Pills):** Tombol kelipatan cepat (`+1x`, `+2x`, `+5x`, `+10x` kenaikan minimum) dan validasi instan di sisi klien.
+- **Navigasi Responsif Penuh:** Header sticky terpadu dengan laci navigasi mobile (hamburger drawer) yang mulus di breakpoint ponsel, tablet, dan desktop.
+- **Proteksi Open Redirect:** Sanitasi URL pengalihan aman pada alur otentikasi OAuth.
+
+---
+
+## Dokumentasi Lengkap
+
+Dokumentasi arsitektur, audit, dan perbaikan tersedia di direktori `docs/`:
+- [Audit Report & Modernization Roadmap](docs/audit-report.md)
+- [End-to-End System Architecture](docs/architecture.md)
+- [Defect Log & Remediation Report](docs/bug-fixes.md)
+- [UI/UX Design System Specification](docs/ui-ux.md)
+
+---
+
+## Prasyarat Lingkungan
+
+- **Node.js:** Versi 20+ (direkomendasikan Node.js 22 atau 24)
+- **Supabase:** Proyek PostgreSQL dengan pgcrypto dan Supabase Auth aktif
+- **Facebook Developer App:** Untuk otentikasi peserta lelang melalui Facebook OAuth
+
+---
+
+## Perintah Kerja (Scripts)
+
+| Perintah | Deskripsi |
+|---|---|
+| `npm run dev` | Menjalankan server pengembangan lokal di `http://localhost:3000` |
+| `npm run build` | Menjalankan build produksi Next.js yang dioptimalkan |
+| `npm run start` | Menjalankan server produksi hasil build lokal |
+| `npm run lint` | Menjalankan ESLint 9 flat-config di seluruh basis kode |
+| `npm test` | Menjalankan suite pengujian unit otomatis menggunakan runner bawaan Node.js |
+
+---
+
+## 1. Setup dan Menjalankan Lokal
+
+Salin konfigurasi environment:
 ```bash
-npm install
+# Linux / macOS
 cp .env.example .env.local
-npm run dev
-```
-Windows PowerShell:
-```powershell
+
+# Windows PowerShell
 Copy-Item .env.example .env.local
 ```
-Isi `.env.local` dengan URL dan publishable key Supabase. Jangan pernah memakai service-role key di browser atau commit secret ke Git.
 
-## 2. Database
-1. Buka Supabase Dashboard → SQL Editor.
-2. Jalankan seluruh `supabase/schema.sql`.
-3. Login pertama kali dengan Facebook.
-4. Di Authentication → Users, salin UUID akun sendiri.
-5. SQL Editor: `update public.profiles set role='admin' where id='UUID-AKUN-ANDA';`
-6. Pembuatan dan pengelolaan barang untuk MVP awal dilakukan melalui SQL Editor sebagai admin database. Dashboard CRUD admin belum termasuk starter ini.
-
-Contoh membuat lelang:
-```sql
-insert into public.auctions
-(title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_by)
-values
-('Kamera Mirrorless', 'Kondisi baik, cek detail sebelum menawar.', null, 'timed', 'live', 1500000, 1500000, 50000,
- now() - interval '5 minutes', now() + interval '2 days',
- 'UUID-ADMIN-DARI-PROFILES');
+Isi `.env.local`:
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-or-publishable-key
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
-Ganti UUID admin. Untuk live event, gunakan `auction_mode='live'`. `status='live'` dan waktu `starts_at`/`ends_at` tetap wajib valid.
 
-## 3. Facebook OAuth
-1. Buka https://developers.facebook.com/ → My Apps → Create App.
-2. Tambahkan produk Facebook Login (Web).
-3. Di Supabase Dashboard → Authentication → Providers → Facebook, aktifkan provider dan salin App ID + App Secret dari Meta.
-4. Supabase Dashboard → Authentication → URL Configuration:
-   - Site URL lokal: `http://localhost:3000`
-   - Redirect URL callback OAuth yang disediakan oleh Supabase (lihat provider setup, umumnya `https://<PROJECT-REF>.supabase.co/auth/v1/callback`)
-   - Tambahkan `http://localhost:3000/auth/callback` ke allowed redirect URLs untuk aplikasi.
-5. Di Meta Facebook Login settings, masukkan URL callback Supabase sebagai Valid OAuth Redirect URI.
-6. Minta izin email yang diperlukan. Facebook dapat tidak mengembalikan email untuk sebagian akun.
-7. Saat siap publik, isi App Domains, Privacy Policy URL, Terms URL, dan lakukan App Review sesuai kebutuhan Meta. Development mode hanya mengizinkan role/tester/developer yang diizinkan Meta.
-8. Tambahkan production URL Vercel ke Supabase redirect allow-list setelah deploy.
+Instal dependensi dan jalankan pengujian:
+```bash
+npm install
+npm test
+npm run lint
+npm run build
+npm run dev
+```
 
-## 4. Deploy ke Vercel
-1. Push folder ini ke repository GitHub.
-2. Vercel → Add New → Project → import repo.
-3. Tambahkan environment variables:
+---
+
+## 2. Setup Database Supabase
+
+1. Buka **Supabase Dashboard → SQL Editor**.
+2. Jalankan seluruh skrip SQL dari `supabase/schema.sql`.
+3. Skrip akan membuat:
+   - Tipe data enum: `user_role`, `auction_mode`, `auction_status`.
+   - Tabel: `profiles`, `auctions`, `bids`.
+   - Trigger `on_auth_user_created` untuk sinkronisasi akun OAuth.
+   - Kebijakan RLS (Row Level Security) yang aman untuk publik dan admin.
+   - Prosedur tersimpan `place_bid(uuid, bigint)` dengan row lock serializable.
+   - Menambahkan tabel `bids` dan `auctions` ke publikasi `supabase_realtime`.
+
+### Memberikan Role Admin:
+Setelah login pertama kali dengan Facebook:
+```sql
+update public.profiles set role = 'admin' where id = 'UUID-AUTH-USER-ANDA';
+```
+
+### Contoh Membuat Lot Lelang Baru:
+```sql
+insert into public.auctions (
+  title,
+  description,
+  image_url,
+  auction_mode,
+  status,
+  starting_price,
+  current_price,
+  min_increment,
+  starts_at,
+  ends_at,
+  created_by
+) values (
+  'Kamera Leica M6 Classic Edition',
+  'Kondisi mulus koleksi pribadi. Lensa Summicron 50mm f/2 included.',
+  null,
+  'timed',
+  'live',
+  15000000,
+  15000000,
+  250000,
+  now() - interval '5 minutes',
+  now() + interval '2 days',
+  'UUID-ADMIN-DARI-PROFILES'
+);
+```
+
+---
+
+## 3. Konfigurasi Facebook OAuth
+
+1. Kunjungi [Meta for Developers](https://developers.facebook.com/) dan buat aplikasi baru.
+2. Tambahkan produk **Facebook Login (Web)**.
+3. Di **Supabase Dashboard → Authentication → Providers → Facebook**, aktifkan provider dan masukkan App ID serta App Secret.
+4. Di **Supabase Dashboard → Authentication → URL Configuration**:
+   - Site URL: `http://localhost:3000` (atau domain produksi).
+   - Redirect URLs: Tambahkan `http://localhost:3000/auth/callback` dan URL domain Vercel Anda.
+5. Di Pengaturan Facebook Login, tambahkan URI redirect Supabase (biasanya `https://<PROJECT-REF>.supabase.co/auth/v1/callback`).
+
+---
+
+## 4. Deployment ke Vercel
+
+1. Push cabang ke repositori GitHub.
+2. Di Vercel Dashboard, buat proyek baru dan impor repositori ini.
+3. Atur variabel lingkungan di Vercel:
    - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-   - `NEXT_PUBLIC_SITE_URL` (URL production)
-4. Deploy.
-5. Tambahkan `https://DOMAIN-ANDA/auth/callback` ke Supabase Authentication → URL Configuration → Redirect URLs. Site URL production juga harus disetel.
-6. Tambahkan domain Vercel ke Facebook Login settings / App Domains jika diperlukan.
-7. Redeploy setelah perubahan env.
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_SITE_URL` (Domain resmi Vercel Anda)
+4. Deploy. Tambahkan `https://domain-anda.vercel.app/auth/callback` ke URL configuration di Supabase.
 
-## Keamanan dan batas MVP
-- `place_bid` adalah satu-satunya jalur penawaran; RLS menolak direct bid insert.
-- RPC menggunakan `SELECT ... FOR UPDATE` agar bid yang bersamaan diserialisasi.
-- `current_price` adalah harga bid tertinggi yang diterima; jika harga yang sama dengan bid tertinggi sebelumnya diajukan, RPC menolaknya karena harus naik minimum.
-- Admin harus ditetapkan lewat SQL tepercaya. Jangan membuat endpoint publik untuk mengubah `profiles.role`.
-- Starter ini belum mencakup dashboard admin CRUD, upload Storage UI, countdown/realtime subscription di browser, penutupan otomatis/penetapan pemenang, anti-bot/rate-limit, notifikasi, escrow, pembayaran, refund, atau audit/dispute workflow.
-- Untuk produksi: implementasikan scheduler/cron untuk menutup lelang tepat waktu dan menetapkan pemenang dengan transaksi database; tambahkan rate limiting, CAPTCHA/risk controls, monitoring, ketentuan hukum dan privasi, serta pengujian keamanan.
-- `current_price` hanya harga terakhir/tertinggi. Tentukan aturan tie-break, perpanjangan waktu anti-sniping, pembatalan, dan sengketa secara eksplisit sebelum peluncuran.
-=======
-# tmdwar
-war bid and happy
->>>>>>> cd1a1e95f98a535c56aa9205ac25ba227a271ce8
+---
+
+## Keamanan & Integritas Data
+
+- Penawaran hanya dapat dilakukan melalui fungsi RPC `place_bid`. Penambahan langsung ke tabel `bids` ditolak oleh RLS.
+- Kunci `SELECT ... FOR UPDATE` memastikan transaksi dieksekusi secara serial, menghilangkan kemungkinan dua penawar diterima pada harga yang sama.
+- Validasi input memeriksa integritas integer, batas nominal minimum, dan jendela waktu lelang aktif.
