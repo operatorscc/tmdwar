@@ -43,14 +43,14 @@ export default function AdminAuctionForm({ mode, initialData, auctionId }: Admin
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    const form = e.currentTarget;
     e.preventDefault();
     setError(null);
     setSuccess(null);
     setSubmitting(true);
 
-const formData = new FormData(form);
-    
-    
+    const formData = new FormData(form);
+
     if (removeImage) {
       formData.append("removeImage", "true");
     }
