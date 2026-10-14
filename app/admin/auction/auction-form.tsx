@@ -86,7 +86,7 @@ export default function AdminAuctionForm({ mode, initialData, auctionId }: Admin
   };
 
   return (
-    <div>
+    <div className="admin-form-workspace">
       {error && (
         <div className="alert-error" style={{ marginBottom: 16 }} role="alert">
           {error}
@@ -98,7 +98,7 @@ export default function AdminAuctionForm({ mode, initialData, auctionId }: Admin
         </div>
       )}
 
-      <form onSubmit={handleSubmit} encType="multipart/form-data" style={{ display: "grid", gap: 20 }}>
+      <form className="admin-auction-form" onSubmit={handleSubmit} encType="multipart/form-data" style={{ display: "grid", gap: 20 }}>
         {/* Title */}
         <div className="form-field">
           <label htmlFor="title" className="form-label">
