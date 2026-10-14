@@ -117,9 +117,14 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
             Total {total} lot terdaftar. Kelola, edit, atau hapus lot lelang.
           </p>
         </div>
-        <Link href="/admin/auction" className="btn-primary" style={{ padding: "12px 20px" }}>
-          + Buat Lelang Baru
-        </Link>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Link href="/admin/finance" className="btn-secondary" style={{ padding: "12px 20px" }}>
+            Keuangan & Akuntansi
+          </Link>
+          <Link href="/admin/auction" className="btn-primary" style={{ padding: "12px 20px" }}>
+            + Buat Lelang Baru
+          </Link>
+        </div>
       </div>
 
       {error && (
