@@ -226,6 +226,50 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
             </tbody>
           </table>
         </div>
+
+        {/* Compact card layout for phones */}
+        <div className="admin-auction-cards" aria-label="Daftar lelang">
+          {auctions.map((a) => (
+            <article key={a.id} className="admin-auction-card">
+              <div className="admin-auction-card-head">
+                {a.image_url ? (
+                  <img src={a.image_url} alt="" className="admin-auction-card-image" loading="lazy" />
+                ) : (
+                  <div className="admin-auction-card-image" style={{ display: "grid", placeItems: "center", color: "var(--gold)", fontSize: 11, fontWeight: 900 }}>TMD</div>
+                )}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className="admin-auction-card-title">{a.title}</div>
+                  <div className="admin-auction-card-meta">
+                    <span style={{ color: STATUS_COLORS[a.status] || "var(--text-secondary)", fontWeight: 800 }}>
+                      {STATUS_LABELS[a.status] || a.status}
+                    </span>
+                    {" · "}
+                    {a.auction_mode === "live" ? "Live Event" : "Timed Auction"}
+                  </div>
+                  <div className="admin-auction-card-meta">Mulai {formatDateWIB(a.starts_at)}</div>
+                  <div className="admin-auction-card-meta">Berakhir {formatDateWIB(a.ends_at)}</div>
+                </div>
+              </div>
+
+              <div className="admin-auction-card-price-grid">
+                <div>
+                  <div className="admin-auction-card-label">Harga awal</div>
+                  <div className="admin-auction-card-value tabular-nums">{rupiah(a.starting_price)}</div>
+                </div>
+                <div>
+                  <div className="admin-auction-card-label">Penawaran tertinggi</div>
+                  <div className="admin-auction-card-value tabular-nums" style={{ color: "var(--gold)" }}>{rupiah(a.current_price)}</div>
+                </div>
+              </div>
+
+              <div className="admin-auction-card-actions">
+                <Link href={`/lelang/${a.id}`} className="btn-secondary">Lihat</Link>
+                <Link href={`/admin/auction/${a.id}`} className="btn-secondary">Edit</Link>
+                {a.status === "draft" && <DeleteButton id={a.id} title={a.title} />}
+              </div>
+            </article>
+          ))}
+        </div>
       ) : (
         <div className="empty-box">
           <div style={{ fontSize: 32, color: "var(--gold)", marginBottom: 8 }}>◈</div>
