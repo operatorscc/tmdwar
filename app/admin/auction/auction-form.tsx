@@ -48,7 +48,9 @@ export default function AdminAuctionForm({ mode, initialData, auctionId }: Admin
     setSuccess(null);
     setSubmitting(true);
 
-    const formData = new FormData(e.currentTarget);
+const formData = new FormData(form);
+    
+    
     if (removeImage) {
       formData.append("removeImage", "true");
     }
@@ -69,7 +71,7 @@ export default function AdminAuctionForm({ mode, initialData, auctionId }: Admin
 
       setSuccess(mode === "create" ? "Lelang berhasil dibuat!" : "Lelang berhasil diperbarui!");
       if (mode === "create") {
-        e.currentTarget.reset();
+        form.reset();
         setPreview(null);
         setRemoveImage(false);
       }
