@@ -63,6 +63,15 @@ export function Navbar({ user }: NavbarProps) {
               Akun Saya
             </Link>
           )}
+          {user?.role === "admin" && (
+            <Link
+              href="/admin/dashboard"
+              className={`nav-link ${pathname.startsWith("/admin") ? "active" : ""}`}
+              style={{ color: "var(--gold)" }}
+            >
+              Panel Admin
+            </Link>
+          )}
         </nav>
 
         {/* Desktop Actions */}
@@ -164,6 +173,16 @@ export function Navbar({ user }: NavbarProps) {
                   style={{ fontSize: 16, padding: "8px 0" }}
                 >
                   Akun Saya ({user.displayName || user.email})
+                </Link>
+              )}
+              {user?.role === "admin" && (
+                <Link
+                  href="/admin/dashboard"
+                  onClick={closeDrawer}
+                  className="nav-link"
+                  style={{ fontSize: 16, padding: "8px 0", color: "var(--gold)" }}
+                >
+                  ⚙ Panel Admin
                 </Link>
               )}
             </div>
