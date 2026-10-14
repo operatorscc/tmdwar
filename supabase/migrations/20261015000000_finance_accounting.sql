@@ -78,20 +78,24 @@ alter table public.finance_inventory_costs enable row level security;
 alter table public.finance_journal_lines enable row level security;
 
 drop policy if exists "Finance admins read accounts" on public.finance_accounts;
+drop policy if exists "Finance admins read accounts" on public.finance_accounts;
 create policy "Finance admins read accounts"
 on public.finance_accounts for select to authenticated
 using ((select public.is_admin()));
 
+drop policy if exists "Finance admins read transactions" on public.finance_transactions;
 drop policy if exists "Finance admins read transactions" on public.finance_transactions;
 create policy "Finance admins read transactions"
 on public.finance_transactions for select to authenticated
 using ((select public.is_admin()));
 
 drop policy if exists "Finance admins read inventory costs" on public.finance_inventory_costs;
+drop policy if exists "Finance admins read inventory costs" on public.finance_inventory_costs;
 create policy "Finance admins read inventory costs"
 on public.finance_inventory_costs for select to authenticated
 using ((select public.is_admin()));
 
+drop policy if exists "Finance admins read journal lines" on public.finance_journal_lines;
 drop policy if exists "Finance admins read journal lines" on public.finance_journal_lines;
 create policy "Finance admins read journal lines"
 on public.finance_journal_lines for select to authenticated
