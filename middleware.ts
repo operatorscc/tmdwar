@@ -1,13 +1,33 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const FALLBACK_SUPABASE_URL = "https://gttrrgwbxuijcenagaha.supabase.co";
+
+function getValidSupabaseUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+
+  if (configuredUrl) {
+    try {
+      const parsedUrl = new URL(configuredUrl);
+      if (parsedUrl.protocol === "https:" || parsedUrl.protocol === "http:") {
+        return parsedUrl.origin;
+      }
+    } catch {
+      // The environment variable may contain a key instead of a URL.
+    }
+  }
+
+  return FALLBACK_SUPABASE_URL;
+}
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://gttrrgwbxuijcenagaha.supabase.co";
+  const url = getValidSupabaseUrl();
   const key =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !key) return response;
+
+  if (!key) return response;
 
   const supabase = createServerClient(url, key, {
     cookies: {
@@ -23,6 +43,7 @@ export async function middleware(request: NextRequest) {
       },
     },
   });
+
   await supabase.auth.getUser();
   return response;
 }
