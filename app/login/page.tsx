@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, Suspense } from "react";
@@ -9,6 +10,7 @@ import { getSafeRedirect } from "@/lib/auction";
 function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
   const searchParams = useSearchParams();
 
   const nextParam = searchParams.get("next");
@@ -21,23 +23,51 @@ function LoginForm() {
 
     try {
       const supabase = createClient();
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-      const redirectTo = `${siteUrl}/auth/callback?next=${encodeURIComponent(safeNext)}`;
 
-      const { error: authError } = await supabase.auth.signInWithOAuth({
-        provider: "facebook",
-        options: {
-          redirectTo,
-          scopes: "email",
-        },
-      });
+      // Bersihkan spasi dan garis miring berlebih dari URL aplikasi.
+      const configuredSiteUrl = (
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        window.location.origin
+      )
+        .trim()
+        .replace(/\s+/g, "")
+        .replace(/\/+$/, "");
+
+      // Pastikan URL memiliki format origin yang valid.
+      const parsedSiteUrl = new URL(configuredSiteUrl);
+
+      if (
+        parsedSiteUrl.protocol !== "https:" &&
+        parsedSiteUrl.hostname !== "localhost"
+      ) {
+        throw new Error("URL aplikasi harus menggunakan HTTPS.");
+      }
+
+      // Gunakan origin saja, tanpa path tambahan.
+      const siteOrigin = parsedSiteUrl.origin;
+
+      const redirectTo = new URL("/auth/callback", siteOrigin);
+      redirectTo.searchParams.set("next", safeNext);
+
+      const { error: authError } =
+        await supabase.auth.signInWithOAuth({
+          provider: "facebook",
+          options: {
+            redirectTo: redirectTo.toString(),
+            scopes: "email",
+          },
+        });
 
       if (authError) {
         setError(authError.message);
         setLoading(false);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal memulai sesi login.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Gagal memulai sesi login."
+      );
       setLoading(false);
     }
   }
@@ -50,7 +80,8 @@ function LoginForm() {
         margin: "0 auto",
         padding: "clamp(28px, 5vw, 44px)",
         border: "1px solid var(--border-hover)",
-        boxShadow: "0 24px 60px rgba(0, 0, 0, 0.6), 0 0 1px var(--gold)",
+        boxShadow:
+          "0 24px 60px rgba(0, 0, 0, 0.6), 0 0 1px var(--gold)",
       }}
     >
       <div style={{ textAlign: "center", marginBottom: 28 }}>
@@ -73,22 +104,52 @@ function LoginForm() {
           T
         </div>
 
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.2em", color: "var(--gold)", textTransform: "uppercase" }}>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.2em",
+            color: "var(--gold)",
+            textTransform: "uppercase",
+          }}
+        >
           OTORISASI PESERTA LELANG
         </div>
 
-        <h1 style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.04em", marginTop: 8 }}>
+        <h1
+          style={{
+            fontSize: 28,
+            fontWeight: 900,
+            letterSpacing: "-0.04em",
+            marginTop: 8,
+          }}
+        >
           Masuk ke TMD-WAR
         </h1>
 
-        <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 8, lineHeight: 1.6 }}>
-          Akses akun resmi untuk mengajukan penawaran lot lelang secara sah dan aman.
+        <p
+          style={{
+            fontSize: 13,
+            color: "var(--text-secondary)",
+            marginTop: 8,
+            lineHeight: 1.6,
+          }}
+        >
+          Akses akun resmi untuk mengajukan penawaran lot lelang
+          secara sah dan aman.
         </p>
       </div>
 
       {(error || errorParam) && (
-        <div className="alert-error" role="alert" style={{ marginBottom: 20 }}>
-          {error || (errorParam === "oauth_callback_failed" ? "Otentikasi Facebook gagal atau dibatalkan. Silakan coba kembali." : errorParam)}
+        <div
+          className="alert-error"
+          role="alert"
+          style={{ marginBottom: 20 }}
+        >
+          {error ||
+            (errorParam === "oauth_callback_failed"
+              ? "Otentikasi Facebook gagal atau dibatalkan. Silakan coba kembali."
+              : errorParam)}
         </div>
       )}
 
@@ -108,21 +169,52 @@ function LoginForm() {
           alignItems: "center",
           justifyContent: "center",
           gap: 12,
+          opacity: loading ? 0.7 : 1,
+          cursor: loading ? "wait" : "pointer",
         }}
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          aria-hidden="true"
+        >
           <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
         </svg>
-        <span>{loading ? "Menghubungkan ke Facebook..." : "Lanjutkan dengan Facebook"}</span>
+
+        <span>
+          {loading
+            ? "Menghubungkan ke Facebook..."
+            : "Lanjutkan dengan Facebook"}
+        </span>
       </button>
 
-      <div style={{ marginTop: 24, borderTop: "1px solid var(--border)", paddingTop: 18, textAlign: "center" }}>
-        <p style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.6 }}>
-          Dengan melanjutkan, Anda menyetujui tata tertib lelang TMD-WAR. Penawaran yang diajukan adalah sah dan mengikat.
+      <div
+        style={{
+          marginTop: 24,
+          borderTop: "1px solid var(--border)",
+          paddingTop: 18,
+          textAlign: "center",
+        }}
+      >
+        <p
+          style={{
+            fontSize: 11.5,
+            color: "var(--text-muted)",
+            lineHeight: 1.6,
+          }}
+        >
+          Dengan melanjutkan, Anda menyetujui tata tertib lelang
+          TMD-WAR. Penawaran yang diajukan adalah sah dan mengikat.
         </p>
 
         <div style={{ marginTop: 16 }}>
-          <Link href="/" className="btn-secondary" style={{ fontSize: 12, padding: "8px 14px" }}>
+          <Link
+            href="/"
+            className="btn-secondary"
+            style={{ fontSize: 12, padding: "8px 14px" }}
+          >
             ← Kembali ke Beranda
           </Link>
         </div>
@@ -133,11 +225,28 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="app-container" style={{ padding: "clamp(48px, 8vw, 84px) 0" }}>
+    <div
+      className="app-container"
+      style={{ padding: "clamp(48px, 8vw, 84px) 0" }}
+    >
       <Suspense
         fallback={
-          <div className="card-framer" style={{ maxWidth: 480, margin: "0 auto", padding: 48, textAlign: "center" }}>
-            <div style={{ color: "var(--gold)", fontSize: 14, fontWeight: 700 }}>
+          <div
+            className="card-framer"
+            style={{
+              maxWidth: 480,
+              margin: "0 auto",
+              padding: 48,
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                color: "var(--gold)",
+                fontSize: 14,
+                fontWeight: 700,
+              }}
+            >
               Memuat formulir otentikasi...
             </div>
           </div>
