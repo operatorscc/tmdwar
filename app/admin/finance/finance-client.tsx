@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 type FinanceKind = "inventory_purchase" | "sale" | "customer_receipt" | "operating_expense";
@@ -317,7 +318,7 @@ export default function FinanceClient() {
                 <h2 style={{ fontSize: 20, fontWeight: 850 }}>Riwayat transaksi</h2>
                 <p style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 4 }}>100 transaksi terbaru. Untuk setiap transaksi, jurnal debit-kredit disimpan otomatis.</p>
               </div>
-              <a href="/admin/dashboard" className="btn-secondary" style={{ padding: "9px 14px", alignSelf: "start" }}>Kembali ke dashboard</a>
+              <Link href="/admin/dashboard" className="btn-secondary" style={{ padding: "9px 14px", alignSelf: "start" }}>Kembali ke dashboard</Link>
             </div>
             {!data?.transactions.length ? (
               <div className="empty-box">Belum ada transaksi keuangan yang dicatat.</div>
