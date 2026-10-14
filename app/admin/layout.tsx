@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import "./admin-ui.css";
 import AdminNavigation from "@/components/AdminNavigation";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
