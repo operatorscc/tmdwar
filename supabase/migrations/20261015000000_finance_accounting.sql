@@ -129,6 +129,7 @@ declare
   v_cost bigint;
   v_sale_amount bigint;
   v_received bigint;
+  v_winner_name text;
   v_account_cash uuid;
   v_account_inventory uuid;
   v_account_receivable uuid;
@@ -179,7 +180,26 @@ begin
     end if;
     select purchase_cost into v_cost from public.finance_inventory_costs where auction_id = p_auction_id;
     if v_cost is null then raise exception 'Catat harga perolehan/pembelian barang terlebih dahulu.'; end if;
-    v_amount := v_auction.current_price;
+
+    -- The base schema has no explicit winner column. Verify the accepted bid log
+    -- and derive the buyer from the highest accepted bid; do not assume every
+    -- ended auction was sold.
+    select b.amount, coalesce(nullif(trim(p.display_name), ''), 'Pemenang lelang')
+      into v_sale_amount, v_winner_name
+    from public.bids b
+    left join public.profiles p on p.id = b.bidder_id
+    where b.auction_id = p_auction_id
+    order by b.amount desc, b.created_at asc
+    limit 1;
+
+    if not found then
+      raise exception 'Lot ini tidak memiliki penawaran yang diterima; penjualan tidak dapat dicatat.';
+    end if;
+    if v_sale_amount <> v_auction.current_price then
+      raise exception 'Harga akhir lot tidak cocok dengan penawaran tertinggi yang tercatat.';
+    end if;
+
+    v_amount := v_sale_amount;
     if v_amount is null or v_amount <= 0 then raise exception 'Harga penjualan harus lebih besar dari nol.'; end if;
   elsif p_kind = 'customer_receipt' then
     if p_auction_id is null then raise exception 'Pilih lot penjualan untuk mencatat penerimaan.'; end if;
@@ -215,7 +235,7 @@ begin
       when 'customer_receipt' then 'Penerimaan pembayaran pelanggan'
       else 'Beban operasional'
     end),
-    nullif(trim(p_counterparty), ''),
+    case when p_kind = 'sale' then v_winner_name else nullif(trim(p_counterparty), '') end,
     nullif(trim(p_reference), ''),
     v_uid
   ) returning id into v_transaction_id;
