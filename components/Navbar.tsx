@@ -119,6 +119,7 @@ export function Navbar({ user }: NavbarProps) {
             onClick={() => setMobileOpen((prev) => !prev)}
             aria-label={mobileOpen ? "Tutup Menu" : "Buka Menu"}
             aria-expanded={mobileOpen}
+            aria-controls="mobile-navigation"
           >
             {mobileOpen ? (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -138,7 +139,7 @@ export function Navbar({ user }: NavbarProps) {
 
       {/* Mobile Drawer */}
       {mobileOpen && (
-        <div className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Menu Navigasi Mobile">
+        <div id="mobile-navigation" className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Menu Navigasi Mobile">
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <Link
