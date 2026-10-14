@@ -25,7 +25,7 @@ export async function GET() {
     return NextResponse.json({ error: adminError || "Akses ditolak." }, { status: 403 });
   }
 
-  const [summaryResult, transactionsResult, auctionsResult] = await Promise.all([
+  const [summaryResult, transactionsResult, auctionsResult, journalResult] = await Promise.all([
     supabase.rpc("finance_dashboard_summary"),
     supabase
       .from("finance_transactions")
@@ -38,6 +38,11 @@ export async function GET() {
       .select("id, title, status, current_price, starting_price")
       .order("created_at", { ascending: false })
       .limit(500),
+    supabase
+      .from("finance_journal_lines")
+      .select("id, transaction_id, auction_id, debit, credit, account:finance_accounts(code, name)")
+      .order("id", { ascending: false })
+      .limit(300),
   ]);
 
   if (summaryResult.error) {
@@ -51,6 +56,9 @@ export async function GET() {
   }
   if (auctionsResult.error) {
     return NextResponse.json({ error: "Gagal memuat daftar lot: " + auctionsResult.error.message }, { status: 500 });
+  }
+  if (journalResult.error) {
+    return NextResponse.json({ error: "Gagal memuat jurnal: " + journalResult.error.message }, { status: 500 });
   }
 
   const { data: inventoryCosts, error: costsError } = await supabase
@@ -71,6 +79,7 @@ export async function GET() {
   return NextResponse.json({
     summary: summaryResult.data,
     transactions: transactionsResult.data ?? [],
+    journalLines: journalResult.data ?? [],
     auctions: auctionsResult.data ?? [],
     inventoryCosts: inventoryCosts ?? [],
     sales: sales ?? [],
