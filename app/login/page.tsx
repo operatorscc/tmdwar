@@ -24,16 +24,9 @@ function LoginForm() {
     try {
       const supabase = createClient();
 
-      // Bersihkan spasi dan garis miring berlebih dari URL aplikasi.
-      const configuredSiteUrl = (
-        process.env.NEXT_PUBLIC_SITE_URL ||
-        window.location.origin
-      )
-        .trim()
-        .replace(/\s+/g, "")
-        .replace(/\/+$/, "");
-
-      // Pastikan URL memiliki format origin yang valid.
+      // Gunakan origin browser saat ini agar cookie PKCE dan callback
+      // tetap berada pada domain yang sama (penting untuk alias Vercel).
+      const configuredSiteUrl = window.location.origin.trim();
       const parsedSiteUrl = new URL(configuredSiteUrl);
 
       if (
@@ -43,7 +36,6 @@ function LoginForm() {
         throw new Error("URL aplikasi harus menggunakan HTTPS.");
       }
 
-      // Gunakan origin saja, tanpa path tambahan.
       const siteOrigin = parsedSiteUrl.origin;
 
       const redirectTo = new URL("/auth/callback", siteOrigin);
