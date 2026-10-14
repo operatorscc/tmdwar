@@ -1036,3 +1036,303 @@ select.form-input {
     scroll-behavior: auto !important;
   }
 }
+
+
+/* =========================================================
+   RESPONSIVE POLISH — mobile-first navigation and layouts
+   ========================================================= */
+html {
+  scroll-padding-top: calc(var(--header-h) + 16px);
+}
+
+img, video, canvas, svg {
+  max-width: 100%;
+}
+
+button, a, input, select, textarea {
+  touch-action: manipulation;
+}
+
+@media (max-width: 820px) {
+  :root {
+    --header-h: 64px;
+  }
+
+  .navbar-root {
+    height: var(--header-h);
+  }
+
+  .navbar-inner {
+    gap: 10px;
+  }
+
+  .brand-group {
+    gap: 9px;
+    min-width: 0;
+  }
+
+  .brand-icon {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    font-size: 16px;
+  }
+
+  .brand-title {
+    font-size: 16px;
+  }
+
+  .brand-sub {
+    font-size: 7px;
+    letter-spacing: 0.2em;
+  }
+
+  /* Account controls live in the mobile drawer to prevent header overflow. */
+  .nav-actions {
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .nav-actions > div,
+  .nav-actions > a {
+    display: none !important;
+  }
+
+  .mobile-nav-toggle {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    border-radius: 10px;
+  }
+
+  .mobile-drawer {
+    top: var(--header-h);
+    bottom: 0;
+    padding: 18px 20px calc(24px + env(safe-area-inset-bottom));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .mobile-drawer .nav-link {
+    display: flex;
+    align-items: center;
+    min-height: 46px;
+    padding: 10px 12px !important;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    font-size: 15px !important;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-drawer .nav-link:hover,
+  .mobile-drawer .nav-link:focus-visible {
+    background: rgba(255, 255, 255, 0.045);
+    border-color: var(--border);
+  }
+
+  .mobile-drawer .btn-primary,
+  .mobile-drawer .btn-secondary {
+    min-height: 46px;
+    font-size: 14px;
+  }
+
+  .hero-section {
+    padding-top: 34px;
+    padding-bottom: 34px;
+  }
+
+  .hero-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .hero-eyebrow {
+    font-size: 9px;
+    letter-spacing: 0.13em;
+    gap: 7px;
+    margin-bottom: 14px;
+  }
+
+  .hero-headline {
+    font-size: clamp(36px, 10vw, 54px);
+    line-height: 1.04;
+    overflow-wrap: anywhere;
+  }
+
+  .hero-lead {
+    font-size: 14px;
+    line-height: 1.7;
+    margin-top: 16px;
+  }
+
+  .hero-ctas {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    margin-top: 24px;
+  }
+
+  .hero-ctas > a {
+    width: 100%;
+    min-height: 46px;
+    padding: 12px 16px;
+    text-align: center;
+  }
+
+  .hero-stats {
+    gap: 10px;
+    margin-top: 28px;
+    padding-top: 18px;
+  }
+
+  .stat-item {
+    padding-right: 8px;
+  }
+
+  .stat-num {
+    font-size: clamp(21px, 6vw, 28px);
+  }
+
+  .stat-label {
+    font-size: 10px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .catalog-section {
+    padding: 40px 0;
+  }
+
+  .section-header {
+    gap: 12px;
+    padding-bottom: 18px;
+    margin-bottom: 22px;
+  }
+
+  .section-title {
+    font-size: clamp(25px, 7vw, 34px);
+    overflow-wrap: anywhere;
+  }
+
+  .filter-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 2px 2px 8px;
+    margin-right: -4px;
+    margin-bottom: 20px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .filter-tab {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 9px 14px;
+    white-space: nowrap;
+  }
+
+  .catalog-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .card-framer:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .detail-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+    padding-top: 16px;
+    padding-bottom: 40px;
+  }
+
+  .detail-panel {
+    padding: 18px;
+  }
+
+  .form-input,
+  input,
+  select,
+  textarea {
+    max-width: 100%;
+    font-size: 16px;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-outline-gold {
+    min-height: 42px;
+  }
+
+  /* Wide admin/account tables remain usable through horizontal scrolling. */
+  .data-table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 11px 12px;
+  }
+
+  .footer-root {
+    padding: 34px 0 24px;
+  }
+
+  .footer-top {
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .footer-links {
+    gap: 14px 20px;
+  }
+
+  .footer-bottom {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 380px) {
+  .app-container {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .brand-sub {
+    letter-spacing: 0.12em;
+  }
+
+  .hero-stats {
+    gap: 7px;
+  }
+
+  .stat-item {
+    padding-right: 5px;
+  }
+
+  .stat-label {
+    font-size: 9px;
+  }
+
+  .mobile-drawer {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
+@media (min-width: 821px) {
+  .mobile-drawer {
+    display: none !important;
+  }
+}
