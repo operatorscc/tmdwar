@@ -180,7 +180,7 @@ export default function FinanceClient() {
   }
 
   return (
-    <div className="app-container" style={{ padding: "40px 0 84px", maxWidth: 1180 }}>
+    <div className="app-container admin-finance-page" style={{ padding: "40px 0 84px", maxWidth: 1180 }}>
       <div style={{ marginBottom: 28 }}>
         <div className="section-tag">Panel Admin · Keuangan</div>
         <h1 style={{ fontSize: "clamp(26px, 4vw, 38px)", fontWeight: 900, letterSpacing: "-0.04em", marginTop: 8 }}>
@@ -199,7 +199,7 @@ export default function FinanceClient() {
       ) : (
         <>
           {data && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14, marginBottom: 32 }}>
+            <div className="admin-finance-summary" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14, marginBottom: 32 }}>
               {[
                 ["Kas tercatat", data.summary.cash],
                 ["Nilai persediaan", data.summary.inventory],
@@ -220,7 +220,7 @@ export default function FinanceClient() {
             </div>
           )}
 
-          <section style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 22, marginBottom: 30 }}>
+          <section className="admin-finance-section admin-finance-entry" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 22, marginBottom: 30 }}>
             <h2 style={{ fontSize: 20, fontWeight: 850, marginBottom: 6 }}>Catat transaksi</h2>
             <p style={{ color: "var(--text-secondary)", fontSize: 12, marginBottom: 20 }}>
               Setiap penyimpanan membuat transaksi dan jurnal berpasangan secara atomik. Penjualan mengambil harga akhir dari lot berstatus selesai.
@@ -312,7 +312,7 @@ export default function FinanceClient() {
             </form>
           </section>
 
-          <section style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 22 }}>
+          <section className="admin-finance-section admin-finance-history" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 22 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
               <div>
                 <h2 style={{ fontSize: 20, fontWeight: 850 }}>Riwayat transaksi</h2>
@@ -323,7 +323,7 @@ export default function FinanceClient() {
             {!data?.transactions.length ? (
               <div className="empty-box">Belum ada transaksi keuangan yang dicatat.</div>
             ) : (
-              <div style={{ overflowX: "auto" }}>
+              <div className="admin-finance-table-wrap" style={{ overflowX: "auto" }}>
                 <table className="data-table">
                   <thead>
                     <tr>
@@ -355,7 +355,7 @@ export default function FinanceClient() {
             )}
           </section>
 
-          <section style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 22, marginTop: 24 }}>
+          <section className="admin-finance-section admin-finance-journal" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 22, marginTop: 24 }}>
             <h2 style={{ fontSize: 20, fontWeight: 850, marginBottom: 6 }}>Jurnal umum</h2>
             <p style={{ color: "var(--text-secondary)", fontSize: 12, marginBottom: 16 }}>
               Rincian debit-kredit dari transaksi keuangan terbaru. Setiap transaksi yang diposting harus seimbang.
