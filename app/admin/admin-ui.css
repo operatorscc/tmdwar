@@ -1,0 +1,34 @@
+.admin-workspace .admin-finance-page{max-width:1440px!important}
+.admin-workspace .admin-finance-summary>div{min-width:0;padding:20px!important;border-color:#e3e8ef!important;border-radius:15px!important;background:linear-gradient(145deg,#fff,#fcfdff)!important;box-shadow:0 4px 14px rgba(22,34,54,.035)!important;transition:transform 150ms ease,box-shadow 150ms ease}
+.admin-workspace .admin-finance-summary>div:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(22,34,54,.06)!important}
+.admin-workspace .admin-finance-summary>div>div:first-child{font-size:12px!important;font-weight:650;line-height:1.5}
+.admin-workspace .admin-finance-summary .tabular-nums{font-size:clamp(17px,1.6vw,22px)!important;line-height:1.35;overflow-wrap:anywhere}
+.admin-workspace .admin-finance-section{min-width:0;padding:clamp(18px,2.4vw,30px)!important;border-color:#e1e7ef!important;border-radius:17px!important;box-shadow:0 6px 22px rgba(22,34,54,.045)!important}
+.admin-workspace .admin-finance-section h2{letter-spacing:-.035em}
+.admin-workspace .admin-finance-section form{gap:18px!important}
+.admin-workspace .admin-finance-section .form-field{margin-bottom:0}
+.admin-workspace .admin-finance-section .form-label{font-size:13px}
+.admin-workspace .admin-finance-section .form-input{min-height:48px}
+.admin-workspace .admin-finance-section button:disabled{opacity:.58;cursor:not-allowed;transform:none;box-shadow:none}
+.admin-workspace .admin-finance-table-wrap{width:100%;max-width:100%;overflow-x:auto;border:1px solid #e7ebf1;border-radius:12px;-webkit-overflow-scrolling:touch}
+.admin-workspace .admin-finance-table-wrap .data-table{min-width:780px}
+.admin-workspace .admin-finance-history .admin-finance-table-wrap .data-table{min-width:850px}
+.admin-workspace .admin-finance-journal .admin-finance-table-wrap .data-table{min-width:720px}
+.admin-workspace .admin-finance-table-wrap .data-table th{position:sticky;top:0;z-index:1}
+.admin-workspace .admin-finance-table-wrap .data-table td{overflow-wrap:anywhere}
+@media(max-width:640px){
+.admin-workspace .admin-finance-page{padding-top:22px!important;padding-bottom:36px!important}
+.admin-workspace .admin-finance-summary{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important;margin-bottom:20px!important}
+.admin-workspace .admin-finance-summary>div{padding:13px 12px!important;border-radius:12px!important}
+.admin-workspace .admin-finance-summary>div>div:first-child{min-height:34px;font-size:10px!important;line-height:1.4}
+.admin-workspace .admin-finance-summary .tabular-nums{font-size:15px!important;letter-spacing:-.035em}
+.admin-workspace .admin-finance-section{padding:15px!important;border-radius:14px!important;margin-bottom:18px!important}
+.admin-workspace .admin-finance-section h2{font-size:18px!important}
+.admin-workspace .admin-finance-section p{font-size:12px!important}
+.admin-workspace .admin-finance-section form{gap:15px!important}
+.admin-workspace .admin-finance-section form>div[style*="display: flex"] button{flex:1;min-height:44px;justify-content:center}
+.admin-workspace .admin-finance-history>div:first-child{align-items:stretch!important}
+.admin-workspace .admin-finance-history>div:first-child>a{align-self:stretch!important;justify-content:center}
+.admin-workspace .admin-finance-table-wrap{border-radius:10px}
+.admin-workspace .admin-finance-table-wrap .data-table th,.admin-workspace .admin-finance-table-wrap .data-table td{padding:12px}
+}
