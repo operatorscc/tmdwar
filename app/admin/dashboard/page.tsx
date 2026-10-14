@@ -147,7 +147,7 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
 
       {/* Table */}
       {auctions.length > 0 ? (
-        <div style={{ backgroundColor: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflowX: "auto" }}>
+        <div className="admin-auction-table-wrap" style={{ backgroundColor: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflowX: "auto" }}>
           <table className="data-table">
             <thead>
               <tr>
