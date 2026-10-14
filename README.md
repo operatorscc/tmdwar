@@ -23,6 +23,7 @@ Dokumentasi arsitektur, audit, dan perbaikan tersedia di direktori `docs/`:
 - [Audit Report & Modernization Roadmap](docs/audit-report.md)
 - [End-to-End System Architecture](docs/architecture.md)
 - [Defect Log & Remediation Report](docs/bug-fixes.md)
+- [Deployment Guide ke Vercel](docs/deployment.md)
 - [UI/UX Design System Specification](docs/ui-ux.md)
 
 ---
