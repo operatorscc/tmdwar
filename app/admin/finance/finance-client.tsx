@@ -35,9 +35,19 @@ interface FinanceTransaction {
   created_at: string;
 }
 
+interface FinanceJournalLine {
+  id: number;
+  transaction_id: string;
+  auction_id: string | null;
+  debit: number | string;
+  credit: number | string;
+  account: { code: string; name: string } | null;
+}
+
 interface FinanceData {
   summary: FinanceSummary;
   transactions: FinanceTransaction[];
+  journalLines: FinanceJournalLine[];
   auctions: FinanceAuction[];
   inventoryCosts: { auction_id: string; purchase_cost: number | string }[];
   sales: { auction_id: string | null; amount: number | string }[];
@@ -273,10 +283,17 @@ export default function FinanceClient() {
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-                <div className="form-field">
-                  <label className="form-label" htmlFor="finance-counterparty">{kind === "inventory_purchase" ? "Pemasok" : kind === "customer_receipt" || kind === "sale" ? "Pelanggan" : "Penerima / pihak terkait"}</label>
-                  <input id="finance-counterparty" className="form-input" value={counterparty} onChange={(event) => setCounterparty(event.target.value)} placeholder="Nama pihak (opsional)" />
-                </div>
+                {kind !== "sale" && (
+                  <div className="form-field">
+                    <label className="form-label" htmlFor="finance-counterparty">{kind === "inventory_purchase" ? "Pemasok" : kind === "customer_receipt" ? "Pelanggan" : "Penerima / pihak terkait"}</label>
+                    <input id="finance-counterparty" className="form-input" value={counterparty} onChange={(event) => setCounterparty(event.target.value)} placeholder="Nama pihak (opsional)" />
+                  </div>
+                )}
+                {kind === "sale" && (
+                  <div style={{ color: "var(--text-secondary)", fontSize: 12, alignSelf: "center" }}>
+                    Nama pembeli diambil otomatis dari profil pemilik penawaran tertinggi yang tercatat.
+                  </div>
+                )}
                 <div className="form-field">
                   <label className="form-label" htmlFor="finance-reference">Nomor bukti / referensi</label>
                   <input id="finance-reference" className="form-input" value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Nomor kuitansi, nota, dll. (opsional)" />
@@ -331,6 +348,46 @@ export default function FinanceClient() {
                         <td className="tabular-nums" style={{ textAlign: "right", whiteSpace: "nowrap" }}>{money(transaction.amount)}</td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 22, marginTop: 24 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 850, marginBottom: 6 }}>Jurnal umum</h2>
+            <p style={{ color: "var(--text-secondary)", fontSize: 12, marginBottom: 16 }}>
+              Rincian debit-kredit dari transaksi keuangan terbaru. Setiap transaksi yang diposting harus seimbang.
+            </p>
+            {!data?.journalLines.length ? (
+              <div className="empty-box">Belum ada baris jurnal.</div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Tanggal</th>
+                      <th scope="col">Referensi transaksi</th>
+                      <th scope="col">Kode akun</th>
+                      <th scope="col">Nama akun</th>
+                      <th scope="col" style={{ textAlign: "right" }}>Debit</th>
+                      <th scope="col" style={{ textAlign: "right" }}>Kredit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.journalLines.map((line) => {
+                      const transaction = data.transactions.find((item) => item.id === line.transaction_id);
+                      return (
+                        <tr key={line.id}>
+                          <td style={{ whiteSpace: "nowrap" }}>{transaction?.transaction_date || "—"}</td>
+                          <td style={{ overflowWrap: "anywhere" }}>{transaction?.reference || line.transaction_id.slice(0, 8)}</td>
+                          <td>{line.account?.code || "—"}</td>
+                          <td>{line.account?.name || "Akun"}</td>
+                          <td className="tabular-nums" style={{ textAlign: "right", whiteSpace: "nowrap" }}>{Number(line.debit) > 0 ? money(line.debit) : "—"}</td>
+                          <td className="tabular-nums" style={{ textAlign: "right", whiteSpace: "nowrap" }}>{Number(line.credit) > 0 ? money(line.credit) : "—"}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
