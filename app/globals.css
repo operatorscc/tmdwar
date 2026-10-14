@@ -2605,3 +2605,62 @@ button, a, input, select, textarea {
     font-size: 11px !important;
   }
 }
+
+
+.admin-workspace .admin-form-workspace .admin-auction-form {
+  padding: 28px;
+  border: 1px solid #e3e8ef;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(22, 34, 54, 0.04);
+}
+
+.admin-workspace .admin-form-workspace .form-field + .form-field {
+  margin-top: 0;
+}
+
+.admin-workspace .admin-form-workspace textarea.form-input {
+  min-height: 120px;
+  line-height: 1.6;
+}
+
+.admin-workspace .admin-form-workspace input[type="file"] {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px;
+  border: 1px dashed #cbd4e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #526075;
+  font-size: 12px;
+}
+
+.admin-workspace .admin-form-workspace button[type="submit"] {
+  min-height: 46px;
+  padding-left: 22px;
+  padding-right: 22px;
+}
+
+@media (max-width: 640px) {
+  .admin-workspace .admin-auction-table-wrap {
+    display: none;
+  }
+
+  .admin-workspace .admin-form-workspace .admin-auction-form {
+    padding: 15px;
+    border-radius: 13px;
+  }
+
+  .admin-workspace .admin-form-workspace textarea.form-input {
+    min-height: 110px;
+  }
+
+  .admin-workspace .admin-form-workspace button[type="submit"] {
+    width: 100%;
+  }
+
+  .admin-workspace .admin-auction-card-actions {
+    flex-wrap: wrap;
+  }
+}
