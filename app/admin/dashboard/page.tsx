@@ -147,6 +147,7 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
 
       {/* Table */}
       {auctions.length > 0 ? (
+        <>
         <div className="admin-auction-table-wrap" style={{ backgroundColor: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflowX: "auto" }}>
           <table className="data-table">
             <thead>
@@ -270,6 +271,7 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
             </article>
           ))}
         </div>
+        </>
       ) : (
         <div className="empty-box">
           <div style={{ fontSize: 32, color: "var(--gold)", marginBottom: 8 }}>◈</div>
