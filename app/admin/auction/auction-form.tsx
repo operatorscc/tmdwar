@@ -208,7 +208,7 @@ export default function AdminAuctionForm({ mode, initialData, auctionId }: Admin
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div className="form-field">
             <label htmlFor="startsAt" className="form-label">
-              Waktu Mulai <span style={{ color: "var(--status-live)" }}>*</span>
+              Waktu Mulai (WIB) <span style={{ color: "var(--status-live)" }}>*</span>
             </label>
             <input
               id="startsAt"
@@ -222,7 +222,7 @@ export default function AdminAuctionForm({ mode, initialData, auctionId }: Admin
 
           <div className="form-field">
             <label htmlFor="endsAt" className="form-label">
-              Waktu Berakhir <span style={{ color: "var(--status-live)" }}>*</span>
+              Waktu Berakhir (WIB) <span style={{ color: "var(--status-live)" }}>*</span>
             </label>
             <input
               id="endsAt"
