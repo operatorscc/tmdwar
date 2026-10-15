@@ -63,8 +63,8 @@ export default async function HomePage() {
             </h1>
 
             <p className="hero-lead">
-              Platform lelang pilihan untuk koleksi eksklusif, karya seni, dan barang bernilai tinggi.
-              Ajukan penawaran terbaik secara aman dengan proteksi konkurensi row-level lock.
+              Platform lelang pilihan untuk koleksi menarik dan barang bernilai tinggi.
+              Pelajari detail lot, pantau harga, dan ajukan penawaran saat lelang berlangsung.
             </p>
 
             <div className="hero-ctas">
@@ -245,14 +245,14 @@ export default async function HomePage() {
             <div className="trust-icon" aria-hidden="true">🔒</div>
             <div>
               <div className="trust-title">Keamanan Transaksi Terkunci</div>
-              <div className="trust-desc">Sistem RPC row-lock mencegah tabrakan penawaran simultan.</div>
+              <div className="trust-desc">Penawaran diproses melalui sistem lelang dengan validasi harga dan waktu.</div>
             </div>
           </div>
           <div className="trust-item">
             <div className="trust-icon" aria-hidden="true">◈</div>
             <div>
               <div className="trust-title">100% Transparansi Riwayat</div>
-              <div className="trust-desc">Setiap bid tercatat resmi dan dapat dipantau oleh seluruh peserta.</div>
+              <div className="trust-desc">Riwayat penawaran dicatat dan ditampilkan sesuai aturan privasi platform.</div>
             </div>
           </div>
           <div className="trust-item">
@@ -324,7 +324,7 @@ export default async function HomePage() {
               {
                 step: "02",
                 title: "Masuk & Ajukan Penawaran",
-                desc: "Gunakan akun Facebook untuk verifikasi identitas bidder. Ajukan penawaran di atas nominal minimum saat lelang berstatus live.",
+                desc: "Masuk menggunakan Google atau Facebook. Ajukan penawaran sesuai kenaikan minimum saat lelang berstatus live.",
               },
               {
                 step: "03",
