@@ -58,39 +58,20 @@ export function AuctionLiveView({
             ...prev,
             ...updated,
           }));
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "bids",
-          filter: `auction_id=eq.${auction.id}`,
-        },
-        (payload) => {
-          const newBid = payload.new as {
-            id: number;
-            amount: number;
-            created_at: string;
-          };
 
-          setBids((prev) => {
-            if (prev.some((b) => b.id === newBid.id)) return prev;
-            const updated: BidRecord = {
-              id: newBid.id,
-              amount: newBid.amount,
-              created_at: newBid.created_at,
-              bidder_name: "Peserta Terverifikasi",
-            };
-            return [updated, ...prev];
-          });
-
-          // Also ensure current price updates
-          setAuction((prev) => ({
-            ...prev,
-            current_price: Math.max(prev.current_price ?? 0, newBid.amount),
-          }));
+          // Bidder identities are private. Refresh the anonymized public feed
+          // when the public auction row changes instead of subscribing to raw bids.
+          void supabase
+            .from("public_bid_feed")
+            .select("id, amount, created_at, bidder_name")
+            .eq("auction_id", auction.id)
+            .order("amount", { ascending: false })
+            .limit(20)
+            .then(({ data, error }) => {
+              if (!error && data) {
+                setBids(data as BidRecord[]);
+              }
+            });
         }
       )
       .subscribe((status) => {
