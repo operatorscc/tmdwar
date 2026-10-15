@@ -38,6 +38,22 @@ const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
 
 /**
+ * Admin datetime-local fields represent Indonesia Western Time (UTC+07:00).
+ * Explicit ISO timestamps keep their supplied timezone; timezone-less form
+ * values are interpreted as WIB and normalized to UTC for timestamptz columns.
+ */
+function parseAuctionDate(value: string): Date | null {
+  const input = value.trim();
+  if (!input) return null;
+
+  const hasTimezone = /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(input);
+  const candidate = hasTimezone ? input : `${input}+07:00`;
+  const parsed = new Date(candidate);
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
  * Validates an image file for type and size.
  */
 export function validateImage(file: File | null): { valid: boolean; error?: string } {
@@ -100,18 +116,17 @@ export function validateAuctionInput(input: AuctionInput): ValidationResult {
   if (!endsAt) {
     errors.push("End time is required.");
   }
-  if (startsAt && endsAt) {
-    const startDate = new Date(startsAt);
-    const endDate = new Date(endsAt);
-    if (Number.isNaN(startDate.getTime())) {
-      errors.push("Start time is not a valid date.");
-    }
-    if (Number.isNaN(endDate.getTime())) {
-      errors.push("End time is not a valid date.");
-    }
-    if (!Number.isNaN(startDate.getTime()) && !Number.isNaN(endDate.getTime()) && endDate <= startDate) {
-      errors.push("End time must be after start time.");
-    }
+  const startDate = startsAt ? parseAuctionDate(startsAt) : null;
+  const endDate = endsAt ? parseAuctionDate(endsAt) : null;
+
+  if (startsAt && !startDate) {
+    errors.push("Start time is not a valid date.");
+  }
+  if (endsAt && !endDate) {
+    errors.push("End time is not a valid date.");
+  }
+  if (startDate && endDate && endDate <= startDate) {
+    errors.push("End time must be after start time.");
   }
 
   return {
@@ -122,10 +137,16 @@ export function validateAuctionInput(input: AuctionInput): ValidationResult {
       description,
       auctionMode: auctionMode as AuctionMode,
       status: status as AuctionStatus,
-      startingPrice: startingPriceStr,
-      minIncrement: minIncrementStr,
-      startsAt,
-      endsAt,
+      startingPrice:
+        Number.isSafeInteger(startingPrice) && startingPrice >= 0
+          ? String(startingPrice)
+          : startingPriceStr,
+      minIncrement:
+        Number.isSafeInteger(minIncrement) && minIncrement > 0
+          ? String(minIncrement)
+          : minIncrementStr,
+      startsAt: startDate?.toISOString() ?? startsAt,
+      endsAt: endDate?.toISOString() ?? endsAt,
     },
   };
 }
