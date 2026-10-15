@@ -17,11 +17,30 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const page = Math.max(1, Number(searchParams.get('page') || '1'));
-  const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit') || '20')));
+  const pageValue = Number(searchParams.get('page') || '1');
+  const limitValue = Number(searchParams.get('limit') || '20');
+  if (!Number.isSafeInteger(pageValue) || pageValue < 1) {
+    return NextResponse.json({ error: 'Parameter page harus bilangan bulat positif.' }, { status: 400 });
+  }
+  if (!Number.isSafeInteger(limitValue) || limitValue < 1) {
+    return NextResponse.json({ error: 'Parameter limit harus bilangan bulat positif.' }, { status: 400 });
+  }
+
+  const page = pageValue;
+  const limit = Math.min(100, limitValue);
   const offset = (page - 1) * limit;
   const statusFilter = searchParams.get('status');
-  const sortBy = searchParams.get('sortBy') || 'created_at';
+  const allowedStatuses = new Set(['draft', 'scheduled', 'live', 'ended', 'cancelled']);
+  if (statusFilter && !allowedStatuses.has(statusFilter)) {
+    return NextResponse.json({ error: 'Filter status lelang tidak valid.' }, { status: 400 });
+  }
+
+  const allowedSortColumns = new Set([
+    'created_at', 'updated_at', 'title', 'status',
+    'starts_at', 'ends_at', 'starting_price', 'current_price',
+  ]);
+  const requestedSort = searchParams.get('sortBy') || 'created_at';
+  const sortBy = allowedSortColumns.has(requestedSort) ? requestedSort : 'created_at';
   const sortOrder = searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc';
 
   let query = supabase
@@ -63,17 +82,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: adminErr || 'Forbidden' }, { status: 403 });
   }
 
-  const formData = await request.formData();
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return NextResponse.json({ error: 'Formulir lelang tidak valid.' }, { status: 400 });
+  }
+
+  const formText = (name: string, fallback = '') => {
+    const value = formData.get(name);
+    return typeof value === 'string' ? value : fallback;
+  };
 
   const input = {
-    title: (formData.get('title') as string ?? '').trim(),
-    description: (formData.get('description') as string ?? '').trim(),
-    auctionMode: (formData.get('auctionMode') as string ?? 'timed'),
-    status: (formData.get('status') as string ?? 'draft'),
-    startingPrice: (formData.get('startingPrice') as string ?? '0'),
-    minIncrement: (formData.get('minIncrement') as string ?? '0'),
-    startsAt: (formData.get('startsAt') as string ?? ''),
-    endsAt: (formData.get('endsAt') as string ?? ''),
+    title: formText('title').trim(),
+    description: formText('description').trim(),
+    auctionMode: formText('auctionMode', 'timed'),
+    status: formText('status', 'draft'),
+    startingPrice: formText('startingPrice', '0'),
+    minIncrement: formText('minIncrement', '0'),
+    startsAt: formText('startsAt'),
+    endsAt: formText('endsAt'),
   };
 
   const validation = validateAuctionInput(input);
@@ -81,7 +110,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: validation.errors.join(' ') }, { status: 400 });
   }
 
-  const imageFile = formData.get('image') as File | null;
+  const imageValue = formData.get('image');
+  if (imageValue !== null && typeof imageValue === 'string' && imageValue !== '') {
+    return NextResponse.json({ error: 'Field gambar harus berupa file.' }, { status: 400 });
+  }
+  const imageFile = imageValue instanceof File ? imageValue : null;
   const imageValidation = validateImage(imageFile);
   if (!imageValidation.valid) {
     return NextResponse.json({ error: imageValidation.error }, { status: 400 });
