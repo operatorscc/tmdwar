@@ -1488,8 +1488,8 @@ button, a, input, select, textarea {
   .mobile-drawer .nav-link:hover,
   .mobile-drawer .nav-link:focus-visible {
     color: var(--gold);
-    background: #242019;
-    border-color: #665538;
+    background: #fff4f0;
+    border-color: #ffe0d7;
   }
 
   .mobile-drawer [style*="border-top"] {
@@ -1500,7 +1500,7 @@ button, a, input, select, textarea {
   .hero-section {
     padding: 24px 0 20px;
     border-bottom: 0;
-    background: linear-gradient(145deg, #111319 0%, #fff 72%);
+    background: linear-gradient(145deg, #fff7f3 0%, #fff 72%);
   }
 
   .hero-grid {
@@ -1570,7 +1570,7 @@ button, a, input, select, textarea {
     gap: 8px;
     margin-top: 17px;
     padding-top: 14px;
-    border-top: 1px solid #383127;
+    border-top: 1px solid #f0e4df;
   }
 
   .stat-item {
@@ -1620,7 +1620,7 @@ button, a, input, select, textarea {
   }
 
   .artwork-fallback {
-    background: linear-gradient(135deg, #242019, #f5f6f8);
+    background: linear-gradient(135deg, #fff0e9, #f5f6f8);
     color: #d9b567;
   }
 
@@ -1693,7 +1693,7 @@ button, a, input, select, textarea {
     width: 30px;
     height: 30px;
     border: 0;
-    background: #29251c;
+    background: #fff0eb;
     color: var(--gold);
   }
 
