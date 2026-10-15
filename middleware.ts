@@ -1,35 +1,22 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-
-const FALLBACK_SUPABASE_URL = "https://gttrrgwbxuijcenagaha.supabase.co";
-
-function getValidSupabaseUrl() {
-  const configuredUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-
-  if (configuredUrl) {
-    try {
-      const parsedUrl = new URL(configuredUrl);
-      if (parsedUrl.protocol === "https:" || parsedUrl.protocol === "http:") {
-        return parsedUrl.origin;
-      }
-    } catch {
-      // The environment variable may contain a key instead of a URL.
-    }
-  }
-
-  return FALLBACK_SUPABASE_URL;
-}
+import { getSupabaseCredentials } from "@/lib/supabase/config";
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
-  const url = getValidSupabaseUrl();
-  const key =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-  if (!key) return response;
+  let credentials: ReturnType<typeof getSupabaseCredentials>;
+  try {
+    credentials = getSupabaseCredentials();
+  } catch (error) {
+    console.error(
+      "[Supabase middleware] Configuration error:",
+      error instanceof Error ? error.message : "Unknown configuration error",
+    );
+    return response;
+  }
 
-  const supabase = createServerClient(url, key, {
+  const supabase = createServerClient(credentials.url, credentials.key, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
