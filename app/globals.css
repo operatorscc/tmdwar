@@ -1621,11 +1621,11 @@ button, a, input, select, textarea {
 
   .artwork-fallback {
     background: linear-gradient(135deg, #242019, #f5f6f8);
-    color: #d84325;
+    color: #d9b567;
   }
 
   .artwork-fallback .monogram {
-    color: #d84325;
+    color: #d9b567;
   }
 
   .hero-grid .card-framer > div:last-child {
@@ -1724,7 +1724,7 @@ button, a, input, select, textarea {
   }
 
   .section-tag {
-    color: #d84325;
+    color: #d9b567;
     font-size: 9px;
     letter-spacing: 0.12em;
   }
@@ -1952,7 +1952,7 @@ button, a, input, select, textarea {
 
   .btn-primary:hover {
     background: #b89445;
-    border-color: #dc4324;
+    border-color: #b89445;
   }
 
   .btn-secondary,
