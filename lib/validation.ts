@@ -46,8 +46,35 @@ function parseAuctionDate(value: string): Date | null {
   const input = value.trim();
   if (!input) return null;
 
+  // Date.parse normalizes impossible dates such as February 30 into March.
+  // Validate the ISO calendar/time components before constructing the Date.
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?)?(?:Z|[+-]\d{2}:?\d{2})?$/i.exec(input);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = match[4] === undefined ? 0 : Number(match[4]);
+  const minute = match[5] === undefined ? 0 : Number(match[5]);
+  const second = match[6] === undefined ? 0 : Number(match[6]);
+  const calendarDate = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    calendarDate.getUTCFullYear() !== year ||
+    calendarDate.getUTCMonth() !== month - 1 ||
+    calendarDate.getUTCDate() !== day ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  ) {
+    return null;
+  }
+
   const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(input);
-  const candidate = hasTimezone ? input : `${input}+07:00`;
+  const candidate = hasTimezone ? input : input + "+07:00";
   const parsed = new Date(candidate);
 
   return Number.isNaN(parsed.getTime()) ? null : parsed;
