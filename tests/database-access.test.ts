@@ -9,25 +9,49 @@ import {
   type Auction,
 } from "../lib/auction.ts";
 
+const ENV_KEYS = [
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+] as const;
+
+function saveEnv() {
+  return Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+}
+
+function restoreEnv(saved: Record<string, string | undefined>) {
+  for (const key of ENV_KEYS) {
+    const value = saved[key];
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+}
+
 describe("Database Client Environment & Credential Validation", () => {
-  it("resolves credentials with safe fallbacks when env is unset", () => {
-    const creds = getSupabaseCredentials();
-    assert.ok(creds.url.startsWith("https://"));
-    assert.ok(creds.key.length > 0);
+  it("rejects missing Supabase configuration instead of using unsafe fallbacks", () => {
+    const saved = saveEnv();
+    try {
+      for (const key of ENV_KEYS) delete process.env[key];
+      assert.throws(
+        () => getSupabaseCredentials(),
+        /Konfigurasi Supabase belum lengkap/
+      );
+    } finally {
+      restoreEnv(saved);
+    }
   });
 
   it("prioritizes NEXT_PUBLIC_SUPABASE_ANON_KEY over PUBLISHABLE_KEY if both exist", () => {
-    const originalAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const originalPub = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-
+    const saved = saveEnv();
     try {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-key-test";
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "pub-key-test";
       const creds = getSupabaseCredentials();
+      assert.equal(creds.url, "https://example.supabase.co");
       assert.equal(creds.key, "anon-key-test");
     } finally {
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = originalAnon;
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = originalPub;
+      restoreEnv(saved);
     }
   });
 });
@@ -54,18 +78,9 @@ describe("Database Authorization & RLS Rule Verification", () => {
 
     const minAllowed = calculateMinBid(auction.current_price, auction.starting_price, auction.min_increment);
     assert.equal(minAllowed, 1550000);
-
-    // Below threshold
-    const lowBid = validateBid(1549999, auction.current_price, auction.starting_price, auction.min_increment);
-    assert.equal(lowBid.valid, false);
-
-    // Exact threshold
-    const exactBid = validateBid(1550000, auction.current_price, auction.starting_price, auction.min_increment);
-    assert.equal(exactBid.valid, true);
-
-    // Above threshold
-    const highBid = validateBid(1600000, auction.current_price, auction.starting_price, auction.min_increment);
-    assert.equal(highBid.valid, true);
+    assert.equal(validateBid(1549999, auction.current_price, auction.starting_price, auction.min_increment).valid, false);
+    assert.equal(validateBid(1550000, auction.current_price, auction.starting_price, auction.min_increment).valid, true);
+    assert.equal(validateBid(1600000, auction.current_price, auction.starting_price, auction.min_increment).valid, true);
   });
 });
 
@@ -98,7 +113,6 @@ describe("Data Access & Query Contract Consistency", () => {
       auction_id: "a0000000-0000-0000-0000-000000000001",
     }));
 
-    // Typical query limit is 20 or 30
     const pageSize = 20;
     const paginated = mockBids.slice(0, pageSize);
     assert.equal(paginated.length, 20);
