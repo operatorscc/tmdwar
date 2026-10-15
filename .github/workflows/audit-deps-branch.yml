@@ -1,0 +1,46 @@
+name: Audit and patch transitive dependencies
+
+on:
+  push:
+    branches:
+      - security/patch-nextjs-15-5-28
+
+permissions:
+  contents: write
+
+jobs:
+  audit-and-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout security branch
+        uses: actions/checkout@v4
+        with:
+          ref: security/patch-nextjs-15-5-28
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Override vulnerable PostCSS transitive dependency
+        run: |
+          npm pkg set 'overrides.postcss=8.5.29'
+          npm install
+
+      - name: Run unit tests
+        run: npx --yes tsx --test tests/*.test.ts
+
+      - name: Report remaining dependency advisories
+        run: |
+          npm audit --json > npm-audit-report.json || true
+          node --input-type=module -e "import fs from 'node:fs'; const a=JSON.parse(fs.readFileSync('npm-audit-report.json','utf8')); console.log('Audit summary:', JSON.stringify(a.metadata?.vulnerabilities ?? {})); for (const [name, item] of Object.entries(a.vulnerabilities ?? {})) console.log(JSON.stringify({name,severity:item.severity,range:item.range,fixAvailable:item.fixAvailable,via:item.via.map(v=>typeof v==='string'?v:{title:v.title,url:v.url,range:v.range})}));"
+
+      - name: Commit package and lockfile changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "security: override PostCSS to patched 8.5.29 [security-deps]" || exit 0
+          git push origin security/patch-nextjs-15-5-28
