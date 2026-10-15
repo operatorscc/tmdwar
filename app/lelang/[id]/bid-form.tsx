@@ -181,7 +181,7 @@ export default function BidForm({
       </button>
 
       <p style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.6, marginTop: 12 }}>
-        Setiap penawaran mengikat dan disimpan permanen dalam buku lelang. Pembayaran akan ditagihkan kepada penawar tertinggi saat penutupan.
+        Setiap penawaran mengikat dan disimpan permanen dalam buku lelang. Detail penyelesaian transaksi akan diinformasikan oleh admin setelah lelang berakhir.
       </p>
     </form>
   );
