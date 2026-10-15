@@ -283,14 +283,14 @@ export function AuctionLiveView({
             ) : !user ? (
               <div style={{ marginTop: 24, textAlign: "center" }}>
                 <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 14 }}>
-                  Masuk menggunakan akun Facebook untuk dapat mengajukan penawaran pada lelang ini.
+                  Masuk menggunakan akun Google atau Facebook untuk dapat mengajukan penawaran pada lelang ini.
                 </p>
                 <Link
                   href={`/login?next=${encodeURIComponent(`/lelang/${auction.id}`)}`}
                   className="btn-primary"
                   style={{ width: "100%", padding: "14px 20px" }}
                 >
-                  Masuk dengan Facebook untuk Menawar ↗
+                  Masuk untuk Menawar ↗
                 </Link>
               </div>
             ) : displayState === "scheduled" ? (
