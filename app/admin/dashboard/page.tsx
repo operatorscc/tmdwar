@@ -82,7 +82,7 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
 
   let query = supabase
     .from("auctions")
-    .select("*", { count: "exact" })
+    .select("id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at", { count: "exact" })
     .order(sortBy, { ascending: sortOrder === "asc" })
     .range(offset, offset + limit - 1);
 
