@@ -68,17 +68,27 @@ export async function PUT(
     return NextResponse.json({ error: 'Auction not found' }, { status: 404 });
   }
 
-  const formData = await request.formData();
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return NextResponse.json({ error: 'Formulir lelang tidak valid.' }, { status: 400 });
+  }
+
+  const formText = (name: string, fallback = '') => {
+    const value = formData.get(name);
+    return typeof value === 'string' ? value : fallback;
+  };
 
   const input = {
-    title: (formData.get('title') as string ?? '').trim(),
-    description: (formData.get('description') as string ?? '').trim(),
-    auctionMode: (formData.get('auctionMode') as string ?? 'timed'),
-    status: (formData.get('status') as string ?? existing.status),
-    startingPrice: (formData.get('startingPrice') as string ?? '0'),
-    minIncrement: (formData.get('minIncrement') as string ?? '0'),
-    startsAt: (formData.get('startsAt') as string ?? ''),
-    endsAt: (formData.get('endsAt') as string ?? ''),
+    title: formText('title').trim(),
+    description: formText('description').trim(),
+    auctionMode: formText('auctionMode', 'timed'),
+    status: formText('status', existing.status),
+    startingPrice: formText('startingPrice', '0'),
+    minIncrement: formText('minIncrement', '0'),
+    startsAt: formText('startsAt'),
+    endsAt: formText('endsAt'),
   };
 
   const validation = validateAuctionInput(input);
@@ -86,7 +96,11 @@ export async function PUT(
     return NextResponse.json({ error: validation.errors.join(' ') }, { status: 400 });
   }
 
-  const imageFile = formData.get('image') as File | null;
+  const imageValue = formData.get('image');
+  if (imageValue !== null && typeof imageValue === 'string' && imageValue !== '') {
+    return NextResponse.json({ error: 'Field gambar harus berupa file.' }, { status: 400 });
+  }
+  const imageFile = imageValue instanceof File ? imageValue : null;
   const imageValidation = validateImage(imageFile);
   if (!imageValidation.valid) {
     return NextResponse.json({ error: imageValidation.error }, { status: 400 });
@@ -147,7 +161,8 @@ export async function PUT(
     .eq('id', id);
 
   if (updateError) {
-    return NextResponse.json({ error: `Failed to update auction: ${updateError.message}` }, { status: 500 });
+    const status = updateError.code === '23514' ? 409 : 500;
+    return NextResponse.json({ error: updateError.message || 'Failed to update auction.' }, { status });
   }
 
   return NextResponse.json({ message: 'Auction updated successfully' });
