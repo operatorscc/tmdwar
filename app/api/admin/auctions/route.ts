@@ -45,7 +45,7 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from('auctions')
-    .select('id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_by, created_at, updated_at', { count: 'exact' })
+    .select('id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at', { count: 'exact' })
     .order(sortBy, { ascending: sortOrder === 'asc' })
     .range(offset, offset + limit - 1);
 
