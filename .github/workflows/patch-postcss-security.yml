@@ -1,0 +1,47 @@
+name: Patch PostCSS to latest secure patch
+
+on:
+  push:
+    branches:
+      - security/patch-postcss-8-5-30
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout security branch
+        uses: actions/checkout@v4
+        with:
+          ref: security/patch-postcss-8-5-30
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Upgrade PostCSS override
+        run: |
+          npm pkg set 'overrides.postcss=8.5.30'
+          npm install
+
+      - name: Verify patched dependency set
+        run: node -e "const p=require('./package-lock.json').packages; for (const n of ['next','react','react-dom','postcss','sharp']) console.log(n,p['node_modules/'+n]?.version); if(p['node_modules/postcss']?.version!=='8.5.30'||p['node_modules/react']?.version!=='19.3.1'||p['node_modules/react-dom']?.version!=='19.3.1'||p['node_modules/next']?.version!=='15.5.28'||p['node_modules/sharp']?.version!=='0.35.5') process.exit(1)"
+
+      - name: Run unit tests
+        run: npx --yes tsx --test tests/*.test.ts
+
+      - name: Build production application
+        run: npm run build
+
+      - name: Commit package and lockfile changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "security: update PostCSS to 8.5.30" || exit 0
+          git push origin security/patch-postcss-8-5-30
