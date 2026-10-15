@@ -46,7 +46,7 @@ function parseAuctionDate(value: string): Date | null {
   const input = value.trim();
   if (!input) return null;
 
-  const hasTimezone = /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(input);
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(input);
   const candidate = hasTimezone ? input : `${input}+07:00`;
   const parsed = new Date(candidate);
 
