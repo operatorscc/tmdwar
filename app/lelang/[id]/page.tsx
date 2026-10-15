@@ -47,7 +47,7 @@ export default async function AuctionDetailPage({ params }: PageProps) {
 
   const { data: auctionData, error: auctionError } = await supabase
     .from("auctions")
-    .select("*")
+    .select("id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at")
     .eq("id", id)
     .maybeSingle();
 
