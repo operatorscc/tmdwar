@@ -1384,8 +1384,7 @@ button, a, input, select, textarea {
 
 /* =========================================================
    MOBILE MARKETPLACE EXPERIENCE — TMD-WAR
-   Light, compact, thumb-friendly layout inspired by modern
-   Indonesian commerce apps. Desktop theme remains unchanged.
+   Compact, thumb-friendly layouts while preserving the TMD-WAR gold brand.
    ========================================================= */
 @media (max-width: 820px) {
   :root {
@@ -1397,12 +1396,12 @@ button, a, input, select, textarea {
     --surface-highlight: #eef0f3;
     --border: #e6e8ec;
     --border-subtle: #eef0f3;
-    --border-hover: rgba(238, 77, 45, 0.35);
-    --gold: #ee4d2d;
-    --gold-light: #ff7b59;
-    --gold-dark: #d93b1d;
-    --gold-glow: rgba(238, 77, 45, 0.12);
-    --gold-glow-subtle: rgba(238, 77, 45, 0.06);
+    --border-hover: rgba(217, 181, 103, 0.38);
+    --gold: #d9b567;
+    --gold-light: #f0d28d;
+    --gold-dark: #b89445;
+    --gold-glow: rgba(217, 181, 103, 0.16);
+    --gold-glow-subtle: rgba(217, 181, 103, 0.08);
     --text-main: #22252b;
     --text-secondary: #626975;
     --text-muted: #858b96;
@@ -1511,7 +1510,7 @@ button, a, input, select, textarea {
   .hero-eyebrow {
     display: inline-flex;
     margin-bottom: 10px;
-    color: #d84325;
+    color: #d9b567;
     font-size: 9px;
     font-weight: 800;
     letter-spacing: 0.12em;
@@ -1622,11 +1621,11 @@ button, a, input, select, textarea {
 
   .artwork-fallback {
     background: linear-gradient(135deg, #fff0e9, #f5f6f8);
-    color: #d84325;
+    color: #d9b567;
   }
 
   .artwork-fallback .monogram {
-    color: #d84325;
+    color: #d9b567;
   }
 
   .hero-grid .card-framer > div:last-child {
@@ -1725,7 +1724,7 @@ button, a, input, select, textarea {
   }
 
   .section-tag {
-    color: #d84325;
+    color: #d9b567;
     font-size: 9px;
     letter-spacing: 0.12em;
   }
@@ -1952,8 +1951,8 @@ button, a, input, select, textarea {
   }
 
   .btn-primary:hover {
-    background: #dc4324;
-    border-color: #dc4324;
+    background: #b89445;
+    border-color: #b89445;
   }
 
   .btn-secondary,
