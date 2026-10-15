@@ -18,7 +18,7 @@ export function Footer() {
               </div>
             </div>
             <p>
-              Platform lelang online kurasi barang pilihan dengan transparansi harga dan keamanan penawaran berbasis database row-level lock.
+              Platform lelang untuk menemukan barang pilihan, memeriksa detail lot, dan mengikuti penawaran dengan informasi yang jelas.
             </p>
           </div>
 
@@ -33,10 +33,10 @@ export function Footer() {
 
         <div className="footer-bottom">
           <div>
-            © {currentYear} TMD-WAR. Hak cipta dilindungi. Versi Starter MVP.
+            © {currentYear} TMD-WAR. Hak cipta dilindungi.
           </div>
           <div style={{ color: "var(--text-muted)" }}>
-            Integrasi pembayaran otomatis dan escrow akan hadir pada rilis berikutnya.
+            Periksa detail lot dan ketentuan lelang sebelum mengajukan penawaran.
           </div>
         </div>
       </div>
