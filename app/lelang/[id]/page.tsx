@@ -38,7 +38,7 @@ interface RawBidData {
   id: number;
   amount: number;
   created_at: string;
-  profiles: { display_name: string | null } | { display_name: string | null }[] | null;
+  bidder_name: string;
 }
 
 export default async function AuctionDetailPage({ params }: PageProps) {
@@ -64,31 +64,25 @@ export default async function AuctionDetailPage({ params }: PageProps) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: bidsData } = await supabase
-    .from("bids")
-    .select("id, amount, created_at, profiles(display_name)")
+  const { data: bidsData, error: bidsError } = await supabase
+    .from("public_bid_feed")
+    .select("id, amount, created_at, bidder_name")
     .eq("auction_id", id)
     .order("amount", { ascending: false })
     .limit(20);
 
+  if (bidsError) {
+    console.error("[Auction detail] Failed to load public bid feed:", bidsError.message);
+  }
+
   const rawBids = (bidsData ?? []) as unknown as RawBidData[];
 
-  const initialBids: BidRecord[] = rawBids.map((b) => {
-    let name = "Peserta";
-    if (b.profiles) {
-      if (Array.isArray(b.profiles)) {
-        name = b.profiles[0]?.display_name || "Peserta";
-      } else {
-        name = b.profiles.display_name || "Peserta";
-      }
-    }
-    return {
-      id: b.id,
-      amount: b.amount,
-      created_at: b.created_at,
-      bidder_name: name,
-    };
-  });
+  const initialBids: BidRecord[] = rawBids.map((bid) => ({
+    id: bid.id,
+    amount: bid.amount,
+    created_at: bid.created_at,
+    bidder_name: bid.bidder_name || "Peserta",
+  }));
 
   const userSummary = user ? { id: user.id, email: user.email } : null;
 
