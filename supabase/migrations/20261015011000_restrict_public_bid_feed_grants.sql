@@ -1,12 +1,3 @@
-begin;
-
--- Views inherit permissive default table grants in some Supabase configurations.
--- Keep the public feed strictly read-only.
-revoke all privileges on table public.public_bid_feed from public, anon, authenticated;
-grant select on table public.public_bid_feed to anon, authenticated;
-
--- Accepted bids must be written only through the validated place_bid RPC.
-revoke insert, update, delete, truncate, references, trigger
-  on table public.bids from anon, authenticated;
-
-commit;
+-- Superseded by the matching applied migration at supabase/migrations/20261015001202_restrict_public_bid_feed_grants.sql.
+-- This compatibility file is intentionally a no-op to avoid replaying an
+-- already-applied schema change under a future migration version.
