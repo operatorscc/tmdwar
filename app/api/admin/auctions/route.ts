@@ -150,7 +150,8 @@ export async function POST(request: Request) {
   }).select('id');
 
   if (insertError) {
-    return NextResponse.json({ error: `Failed to create auction: ${insertError.message}` }, { status: 500 });
+    const status = insertError.code === '23514' ? 400 : 500;
+    return NextResponse.json({ error: insertError.message || 'Failed to create auction.' }, { status });
   }
 
   return NextResponse.json({ message: 'Auction created successfully', id: insertData?.[0]?.id }, { status: 201 });
