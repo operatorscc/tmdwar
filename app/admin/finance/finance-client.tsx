@@ -50,6 +50,7 @@ interface FinanceData {
   transactions: FinanceTransaction[];
   transactionPagination: { page: number; pageSize: number; total: number; totalPages: number };
   journalLines: FinanceJournalLine[];
+  journalTransactions: { id: string; transaction_date: string; reference: string | null }[];
   journalPagination: { page: number; pageSize: number; total: number; totalPages: number };
   auctions: FinanceAuction[];
   inventoryCosts: { auction_id: string; purchase_cost: number | string }[];
@@ -119,11 +120,20 @@ export default function FinanceClient() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    setTransactionPage(1);
+  }, [historySearch, historyKind, historyFrom, historyTo]);
+
   const auctionMap = useMemo(() => {
     const map = new Map<string, FinanceAuction>();
     for (const auction of data?.auctions ?? []) map.set(auction.id, auction);
     return map;
   }, [data?.auctions]);
+
+  const journalTransactionMap = useMemo(
+    () => new Map((data?.journalTransactions ?? []).map((transaction) => [transaction.id, transaction])),
+    [data?.journalTransactions],
+  );
 
   const purchasedIds = useMemo(
     () => new Set((data?.inventoryCosts ?? []).map((item) => item.auction_id)),
@@ -448,7 +458,7 @@ export default function FinanceClient() {
                   </thead>
                   <tbody>
                     {data.journalLines.map((line) => {
-                      const transaction = data.transactions.find((item) => item.id === line.transaction_id);
+                      const transaction = journalTransactionMap.get(line.transaction_id);
                       return (
                         <tr key={line.id}>
                           <td style={{ whiteSpace: "nowrap" }}>{transaction?.transaction_date || "—"}</td>
