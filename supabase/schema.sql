@@ -91,9 +91,15 @@ with check (public.is_admin() and created_by = (select auth.uid()));
 create policy "Admins can update auctions"
 on public.auctions for update to authenticated
 using (public.is_admin()) with check (public.is_admin());
-create policy "Admins can delete draft auctions"
+-- Keep the baseline schema aligned with the safe-delete migration.
+-- Only unreferenced draft, ended, or cancelled auctions may be deleted.
+-- Foreign-key RESTRICT constraints preserve any auction with bid history.
+create policy "Admins can delete removable auctions"
 on public.auctions for delete to authenticated
-using (public.is_admin() and status = 'draft');
+using (
+  public.is_admin()
+  and status in ('draft', 'ended', 'cancelled')
+);
 
 -- Anyone can read public bid history; no direct insert/update/delete from clients.
 create policy "Public can read bids"
