@@ -167,7 +167,9 @@ grant execute on function public.place_bid(uuid,bigint) to authenticated;
 
 -- Keep table mutation privileges explicit and narrow.
 revoke insert, update, delete on public.bids from anon, authenticated;
-grant select on public.bids to anon, authenticated;
+revoke select on public.bids from anon;
+grant select on public.bids to authenticated;
+grant select on public.public_bid_feed to anon, authenticated;
 grant select on public.auctions to anon, authenticated;
 grant insert, update, delete on public.auctions to authenticated;
 grant select on public.profiles to authenticated;
