@@ -217,7 +217,7 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
                       >
                         Edit
                       </Link>
-                      <DeleteButton id={a.id} title={a.title} canDelete={["draft", "ended", "cancelled"].includes(a.status)} status={a.status} />
+                      <DeleteButton id={a.id} title={a.title} canDelete={["draft", "ended", "cancelled"].includes(a.status)} />
                     </div>
                   </td>
                 </tr>
