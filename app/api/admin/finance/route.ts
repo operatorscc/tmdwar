@@ -68,12 +68,15 @@ export async function GET() {
     return NextResponse.json({ error: "Gagal memuat harga perolehan: " + costsError.message }, { status: 500 });
   }
 
-  const { data: sales, error: salesError } = await supabase
-    .from("finance_transactions")
-    .select("auction_id, amount")
-    .eq("kind", "sale");
-  if (salesError) {
-    return NextResponse.json({ error: "Gagal memuat penjualan: " + salesError.message }, { status: 500 });
+  const [salesResult, receiptsResult] = await Promise.all([
+    supabase.from("finance_transactions").select("auction_id, amount").eq("kind", "sale"),
+    supabase.from("finance_transactions").select("auction_id, amount").eq("kind", "customer_receipt"),
+  ]);
+  if (salesResult.error) {
+    return NextResponse.json({ error: "Gagal memuat penjualan: " + salesResult.error.message }, { status: 500 });
+  }
+  if (receiptsResult.error) {
+    return NextResponse.json({ error: "Gagal memuat penerimaan pembayaran: " + receiptsResult.error.message }, { status: 500 });
   }
 
   return NextResponse.json({
@@ -82,7 +85,8 @@ export async function GET() {
     journalLines: journalResult.data ?? [],
     auctions: auctionsResult.data ?? [],
     inventoryCosts: inventoryCosts ?? [],
-    sales: sales ?? [],
+    sales: salesResult.data ?? [],
+    receipts: receiptsResult.data ?? [],
   });
 }
 
@@ -130,7 +134,7 @@ export async function POST(request: Request) {
   if (!KINDS.has(kind)) {
     return NextResponse.json({ error: "Jenis transaksi tidak valid." }, { status: 400 });
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(transactionDate) || Number.isNaN(Date.parse(transactionDate))) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(transactionDate) || Number.isNaN(Date.parse(transactionDate)) || new Date(`${transactionDate}T00:00:00.000Z`).toISOString().slice(0, 10) !== transactionDate) {
     return NextResponse.json({ error: "Tanggal transaksi wajib diisi dengan format yang valid." }, { status: 400 });
   }
   if (kind !== "sale" && (amount === null || !Number.isSafeInteger(amount) || amount <= 0)) {
