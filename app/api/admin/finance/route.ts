@@ -9,7 +9,7 @@ const KINDS = new Set([
   "operating_expense",
 ]);
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -25,14 +25,20 @@ export async function GET() {
     return NextResponse.json({ error: adminError || "Akses ditolak." }, { status: 403 });
   }
 
+  const url = new URL(request.url);
+  const transactionPage = Math.max(1, Math.min(100000, Number.parseInt(url.searchParams.get("page") || "1", 10) || 1));
+  const journalPage = Math.max(1, Math.min(100000, Number.parseInt(url.searchParams.get("journalPage") || "1", 10) || 1));
+  const pageSize = 50;
+  const journalPageSize = 100;
+
   const [summaryResult, transactionsResult, auctionsResult, journalResult] = await Promise.all([
     supabase.rpc("finance_dashboard_summary"),
     supabase
       .from("finance_transactions")
-      .select("id, transaction_date, kind, amount, auction_id, description, counterparty, reference, created_at")
+      .select("id, transaction_date, kind, amount, auction_id, description, counterparty, reference, created_at", { count: "exact" })
       .order("transaction_date", { ascending: false })
       .order("created_at", { ascending: false })
-      .limit(100),
+      .range((transactionPage - 1) * pageSize, transactionPage * pageSize - 1),
     supabase
       .from("auctions")
       .select("id, title, status, current_price, starting_price")
@@ -40,9 +46,9 @@ export async function GET() {
       .limit(500),
     supabase
       .from("finance_journal_lines")
-      .select("id, transaction_id, auction_id, debit, credit, account:finance_accounts(code, name)")
+      .select("id, transaction_id, auction_id, debit, credit, account:finance_accounts(code, name)", { count: "exact" })
       .order("id", { ascending: false })
-      .limit(300),
+      .range((journalPage - 1) * journalPageSize, journalPage * journalPageSize - 1),
   ]);
 
   if (summaryResult.error) {
@@ -82,7 +88,19 @@ export async function GET() {
   return NextResponse.json({
     summary: summaryResult.data,
     transactions: transactionsResult.data ?? [],
+    transactionPagination: {
+      page: transactionPage,
+      pageSize,
+      total: transactionsResult.count ?? 0,
+      totalPages: Math.max(1, Math.ceil((transactionsResult.count ?? 0) / pageSize)),
+    },
     journalLines: journalResult.data ?? [],
+    journalPagination: {
+      page: journalPage,
+      pageSize: journalPageSize,
+      total: journalResult.count ?? 0,
+      totalPages: Math.max(1, Math.ceil((journalResult.count ?? 0) / journalPageSize)),
+    },
     auctions: auctionsResult.data ?? [],
     inventoryCosts: inventoryCosts ?? [],
     sales: salesResult.data ?? [],
