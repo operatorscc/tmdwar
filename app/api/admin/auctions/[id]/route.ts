@@ -168,7 +168,7 @@ export async function PUT(
   return NextResponse.json({ message: 'Auction updated successfully' });
 }
 
-// ─── DELETE /api/admin/auctions/[id]: Delete auction (draft only) ───────────
+// ─── DELETE /api/admin/auctions/[id]: Delete safe, unreferenced auctions ───────────
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -186,7 +186,7 @@ export async function DELETE(
     return NextResponse.json({ error: adminErr || 'Forbidden' }, { status: 403 });
   }
 
-  // Fetch to verify status — only drafts can be deleted per RLS policy
+  // Fetch to verify status against the RLS policy for removable auction states
   const { data: existing, error: fetchError } = await supabase
     .from('auctions')
     .select('id, status')
@@ -200,17 +200,25 @@ export async function DELETE(
     return NextResponse.json({ error: 'Auction not found' }, { status: 404 });
   }
 
-  if (existing.status !== 'draft') {
+  const deletableStatuses = new Set(['draft', 'ended', 'cancelled']);
+  if (!deletableStatuses.has(existing.status)) {
     return NextResponse.json(
-      { error: 'Only draft auctions can be deleted. Use "cancelled" status to retire active auctions.' },
+      { error: 'Lelang berstatus Terjadwal atau Live tidak dapat dihapus. Ubah status menjadi Dibatalkan terlebih dahulu.' },
       { status: 409 }
     );
   }
 
+  // Foreign keys intentionally protect bid history, official results, and finance records.
   const { error: deleteError } = await supabase.from('auctions').delete().eq('id', id);
 
   if (deleteError) {
-    return NextResponse.json({ error: `Failed to delete auction: ${deleteError.message}` }, { status: 500 });
+    if (deleteError.code === '23503') {
+      return NextResponse.json(
+        { error: 'Lelang tidak dapat dihapus karena sudah memiliki riwayat penawaran, hasil lelang, atau transaksi keuangan. Data riwayat tetap dipertahankan.' },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json({ error: `Gagal menghapus lelang: ${deleteError.message}` }, { status: 500 });
   }
 
   return NextResponse.json({ message: 'Auction deleted successfully' });
