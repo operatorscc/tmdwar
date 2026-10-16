@@ -6,7 +6,7 @@ interface DeleteButtonProps {
   canDelete: boolean;
 }
 
-export default function DeleteButton({ id, title, canDelete, status }: DeleteButtonProps) {
+export default function DeleteButton({ id, title, canDelete }: DeleteButtonProps) {
   const handleDelete = async () => {
     if (!canDelete) return;
     if (!confirm(`Hapus lelang "${title}"? Tindakan ini tidak dapat dibatalkan.`)) {
