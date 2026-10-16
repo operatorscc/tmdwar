@@ -52,6 +52,7 @@ interface FinanceData {
   auctions: FinanceAuction[];
   inventoryCosts: { auction_id: string; purchase_cost: number | string }[];
   sales: { auction_id: string | null; amount: number | string }[];
+  receipts: { auction_id: string | null; amount: number | string }[];
 }
 
 const KIND_LABELS: Record<FinanceKind, string> = {
@@ -88,6 +89,10 @@ export default function FinanceClient() {
   const [description, setDescription] = useState("");
   const [counterparty, setCounterparty] = useState("");
   const [reference, setReference] = useState("");
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyKind, setHistoryKind] = useState<"all" | FinanceKind>("all");
+  const [historyFrom, setHistoryFrom] = useState("");
+  const [historyTo, setHistoryTo] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -124,14 +129,50 @@ export default function FinanceClient() {
     () => new Set((data?.sales ?? []).map((item) => item.auction_id).filter((id): id is string => Boolean(id))),
     [data?.sales],
   );
+  const paidByAuction = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const receipt of data?.receipts ?? []) {
+      if (!receipt.auction_id) continue;
+      totals.set(receipt.auction_id, (totals.get(receipt.auction_id) ?? 0) + Number(receipt.amount ?? 0));
+    }
+    return totals;
+  }, [data?.receipts]);
+  const saleByAuction = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const sale of data?.sales ?? []) {
+      if (!sale.auction_id) continue;
+      totals.set(sale.auction_id, (totals.get(sale.auction_id) ?? 0) + Number(sale.amount ?? 0));
+    }
+    return totals;
+  }, [data?.sales]);
+  const remainingByAuction = useMemo(() => {
+    const remaining = new Map<string, number>();
+    for (const [id, total] of saleByAuction) {
+      remaining.set(id, Math.max(0, total - (paidByAuction.get(id) ?? 0)));
+    }
+    return remaining;
+  }, [saleByAuction, paidByAuction]);
+  const selectedRemaining = remainingByAuction.get(auctionId) ?? 0;
+  const visibleTransactions = useMemo(() => {
+    const query = historySearch.trim().toLocaleLowerCase("id-ID");
+    return (data?.transactions ?? []).filter((transaction) => {
+      if (historyKind !== "all" && transaction.kind !== historyKind) return false;
+      if (historyFrom && transaction.transaction_date < historyFrom) return false;
+      if (historyTo && transaction.transaction_date > historyTo) return false;
+      if (!query) return true;
+      const auctionTitle = transaction.auction_id ? auctionMap.get(transaction.auction_id)?.title ?? "" : "operasional";
+      return [transaction.description, transaction.counterparty, transaction.reference, auctionTitle, KIND_LABELS[transaction.kind]]
+        .some((value) => String(value ?? "").toLocaleLowerCase("id-ID").includes(query));
+    });
+  }, [data?.transactions, historySearch, historyKind, historyFrom, historyTo, auctionMap]);
 
   const eligibleAuctions = useMemo(() => {
     const auctions = data?.auctions ?? [];
     if (kind === "inventory_purchase") return auctions.filter((auction) => !purchasedIds.has(auction.id));
     if (kind === "sale") return auctions.filter((auction) => auction.status === "ended" && purchasedIds.has(auction.id) && !soldIds.has(auction.id));
-    if (kind === "customer_receipt") return auctions.filter((auction) => soldIds.has(auction.id));
+    if (kind === "customer_receipt") return auctions.filter((auction) => soldIds.has(auction.id) && (remainingByAuction.get(auction.id) ?? 0) > 0);
     return [];
-  }, [data?.auctions, kind, purchasedIds, soldIds]);
+  }, [data?.auctions, kind, purchasedIds, soldIds, remainingByAuction]);
 
   useEffect(() => {
     if (kind === "operating_expense") {
@@ -243,7 +284,7 @@ export default function FinanceClient() {
                     <option value="">Pilih lot</option>
                     {eligibleAuctions.map((auction) => (
                       <option key={auction.id} value={auction.id}>
-                        {auction.title} · {auction.status} · Harga {money(auction.current_price)}
+                        {auction.title} · {auction.status} · Harga {money(auction.current_price)}{kind === "customer_receipt" ? ` · Sisa ${money(remainingByAuction.get(auction.id) ?? 0)}` : ""}
                       </option>
                     ))}
                   </select>
@@ -253,7 +294,7 @@ export default function FinanceClient() {
                         ? "Semua lot yang tersedia sudah memiliki catatan harga perolehan."
                         : kind === "sale"
                           ? "Penjualan hanya tersedia untuk lot berstatus ended yang harga perolehannya sudah dicatat dan belum pernah dijual."
-                          : "Catat penjualan terlebih dahulu sebelum merekam penerimaan pembayaran."}
+                          : "Tidak ada piutang tersisa untuk lot yang sudah terjual. Catat penjualan terlebih dahulu atau periksa riwayat penerimaan."}
                     </p>
                   )}
                 </div>
@@ -264,7 +305,15 @@ export default function FinanceClient() {
                   <label className="form-label" htmlFor="finance-amount">
                     {kind === "inventory_purchase" ? "Harga perolehan barang (IDR)" : kind === "customer_receipt" ? "Nominal penerimaan (IDR)" : "Nominal beban (IDR)"}
                   </label>
-                  <input id="finance-amount" className="form-input tabular-nums" type="number" min={1} step={1} required value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Contoh: 5000000" />
+                  <input id="finance-amount" className="form-input tabular-nums" type="number" min={1} max={kind === "customer_receipt" ? selectedRemaining : undefined} step={1} required value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Contoh: 5000000" />
+                  {kind === "customer_receipt" && auctionId && (
+                    <div style={{ marginTop: 8, padding: 12, borderRadius: "var(--radius-sm)", background: "var(--surface-elevated)", fontSize: 13 }}>
+                      <div>Total penjualan: <strong>{money(saleByAuction.get(auctionId) ?? 0)}</strong></div>
+                      <div>Sudah dibayar: <strong>{money(paidByAuction.get(auctionId) ?? 0)}</strong></div>
+                      <div>Sisa piutang: <strong>{money(selectedRemaining)}</strong></div>
+                      {Number(amount) > selectedRemaining && <p role="alert" style={{ color: "var(--danger, #c0392b)", marginTop: 6 }}>Nominal penerimaan tidak boleh melebihi sisa piutang.</p>}
+                    </div>
+                  )}
                 </div>
               )}
               {kind === "sale" && (
@@ -302,7 +351,7 @@ export default function FinanceClient() {
               </div>
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                <button className="btn-primary" type="submit" disabled={saving || (kind !== "operating_expense" && !auctionId) || (kind !== "sale" && (!amount || Number(amount) <= 0))} style={{ padding: "12px 20px" }}>
+                <button className="btn-primary" type="submit" disabled={saving || (kind !== "operating_expense" && !auctionId) || (kind !== "sale" && (!amount || !Number.isSafeInteger(Number(amount)) || Number(amount) <= 0)) || (kind === "customer_receipt" && Number(amount) > selectedRemaining) style={{ padding: "12px 20px" }}>
                   {saving ? "Menyimpan…" : "Simpan transaksi"}
                 </button>
                 <button className="btn-secondary" type="button" onClick={() => void load()} disabled={loading || saving} style={{ padding: "12px 20px" }}>
@@ -316,12 +365,23 @@ export default function FinanceClient() {
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
               <div>
                 <h2 style={{ fontSize: 20, fontWeight: 850 }}>Riwayat transaksi</h2>
-                <p style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 4 }}>100 transaksi terbaru. Untuk setiap transaksi, jurnal debit-kredit disimpan otomatis.</p>
+                <p style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 4 }}>Cari dan saring hingga 100 transaksi terbaru yang dimuat dari server.</p>
               </div>
               <Link href="/admin/dashboard" className="btn-secondary" style={{ padding: "9px 14px", alignSelf: "start" }}>Kembali ke dashboard</Link>
             </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 16 }}>
+              <input className="form-input" aria-label="Cari transaksi" value={historySearch} onChange={(event) => setHistorySearch(event.target.value)} placeholder="Cari lot, pihak, referensi…" />
+              <select className="form-input" aria-label="Filter jenis transaksi" value={historyKind} onChange={(event) => setHistoryKind(event.target.value as "all" | FinanceKind)}>
+                <option value="all">Semua jenis transaksi</option>
+                {Object.entries(KIND_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+              <label className="form-field"><span className="form-label">Dari tanggal</span><input className="form-input" type="date" value={historyFrom} max={historyTo || undefined} onChange={(event) => setHistoryFrom(event.target.value)} /></label>
+              <label className="form-field"><span className="form-label">Sampai tanggal</span><input className="form-input" type="date" value={historyTo} min={historyFrom || undefined} onChange={(event) => setHistoryTo(event.target.value)} /></label>
+            </div>
             {!data?.transactions.length ? (
               <div className="empty-box">Belum ada transaksi keuangan yang dicatat.</div>
+            ) : visibleTransactions.length === 0 ? (
+              <div className="empty-box">Tidak ada transaksi yang cocok dengan filter.</div>
             ) : (
               <div className="admin-finance-table-wrap" style={{ overflowX: "auto" }}>
                 <table className="data-table">
@@ -336,7 +396,7 @@ export default function FinanceClient() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.transactions.map((transaction) => (
+                    {visibleTransactions.map((transaction) => (
                       <tr key={transaction.id}>
                         <td style={{ whiteSpace: "nowrap" }}>{transaction.transaction_date}</td>
                         <td>{KIND_LABELS[transaction.kind] || transaction.kind}</td>
