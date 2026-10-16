@@ -79,8 +79,10 @@ alter table public.profiles enable row level security;
 alter table public.auctions enable row level security;
 alter table public.bids enable row level security;
 
-create policy "Profiles are readable to authenticated users"
-on public.profiles for select to authenticated using (true);
+-- Profiles are private by default; admins can read profiles for administration.
+create policy "Users can read own profile or admins all"
+on public.profiles for select to authenticated
+using (id = (select auth.uid()) or (select public.is_admin()));
 -- Public can view published auctions. Admin can view all, including drafts.
 create policy "Public can read published auctions"
 on public.auctions for select to anon, authenticated
@@ -91,13 +93,37 @@ with check (public.is_admin() and created_by = (select auth.uid()));
 create policy "Admins can update auctions"
 on public.auctions for update to authenticated
 using (public.is_admin()) with check (public.is_admin());
-create policy "Admins can delete draft auctions"
+-- Keep the baseline schema aligned with the safe-delete migration.
+-- Only unreferenced draft, ended, or cancelled auctions may be deleted.
+-- Foreign-key RESTRICT constraints preserve any auction with bid history.
+create policy "Admins can delete removable auctions"
 on public.auctions for delete to authenticated
-using (public.is_admin() and status = 'draft');
+using (
+  public.is_admin()
+  and status in ('draft', 'ended', 'cancelled')
+);
 
--- Anyone can read public bid history; no direct insert/update/delete from clients.
-create policy "Public can read bids"
-on public.bids for select to anon, authenticated using (true);
+-- Raw bids contain bidder UUIDs. Only a bidder's own rows and admins are
+-- readable directly; public history is served through the anonymized view.
+create policy "Users can read own bids or admins all"
+on public.bids for select to authenticated
+using (bidder_id = (select auth.uid()) or (select public.is_admin()));
+
+create or replace view public.public_bid_feed
+with (security_invoker = false)
+as
+select
+  b.id,
+  b.auction_id,
+  b.amount,
+  b.created_at,
+  'Peserta #' || dense_rank() over (
+    partition by b.auction_id
+    order by b.bidder_id
+  )::text as bidder_name
+from public.bids b
+join public.auctions a on a.id = b.auction_id
+where a.status in ('scheduled', 'live', 'ended');
 
 -- Bid submission is only through this transaction. Row lock serializes competing bids.
 create or replace function public.place_bid(p_auction_id uuid, p_amount bigint)
@@ -141,7 +167,9 @@ grant execute on function public.place_bid(uuid,bigint) to authenticated;
 
 -- Keep table mutation privileges explicit and narrow.
 revoke insert, update, delete on public.bids from anon, authenticated;
-grant select on public.bids to anon, authenticated;
+revoke select on public.bids from anon;
+grant select on public.bids to authenticated;
+grant select on public.public_bid_feed to anon, authenticated;
 grant select on public.auctions to anon, authenticated;
 grant insert, update, delete on public.auctions to authenticated;
 grant select on public.profiles to authenticated;
