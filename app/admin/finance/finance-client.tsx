@@ -351,7 +351,7 @@ export default function FinanceClient() {
               </div>
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                <button className="btn-primary" type="submit" disabled={saving || (kind !== "operating_expense" && !auctionId) || (kind !== "sale" && (!amount || !Number.isSafeInteger(Number(amount)) || Number(amount) <= 0)) || (kind === "customer_receipt" && Number(amount) > selectedRemaining) style={{ padding: "12px 20px" }}>
+                <button className="btn-primary" type="submit" disabled={saving || (kind !== "operating_expense" && !auctionId) || (kind !== "sale" && (!amount || !Number.isSafeInteger(Number(amount)) || Number(amount) <= 0)) || (kind === "customer_receipt" && Number(amount) > selectedRemaining)} style={{ padding: "12px 20px" }}>
                   {saving ? "Menyimpan…" : "Simpan transaksi"}
                 </button>
                 <button className="btn-secondary" type="button" onClick={() => void load()} disabled={loading || saving} style={{ padding: "12px 20px" }}>
