@@ -67,6 +67,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Gagal memuat jurnal: " + journalResult.error.message }, { status: 500 });
   }
 
+  const journalTransactionIds = [...new Set((journalResult.data ?? []).map((line) => line.transaction_id))];
+  let journalTransactions: { id: string; transaction_date: string; reference: string | null }[] = [];
+  if (journalTransactionIds.length > 0) {
+    const { data, error } = await supabase
+      .from("finance_transactions")
+      .select("id, transaction_date, reference")
+      .in("id", journalTransactionIds);
+    if (error) {
+      return NextResponse.json({ error: "Gagal memuat referensi jurnal: " + error.message }, { status: 500 });
+    }
+    journalTransactions = data ?? [];
+  }
+
   const { data: inventoryCosts, error: costsError } = await supabase
     .from("finance_inventory_costs")
     .select("auction_id, purchase_cost");
@@ -95,6 +108,7 @@ export async function GET(request: Request) {
       totalPages: Math.max(1, Math.ceil((transactionsResult.count ?? 0) / pageSize)),
     },
     journalLines: journalResult.data ?? [],
+    journalTransactions,
     journalPagination: {
       page: journalPage,
       pageSize: journalPageSize,
