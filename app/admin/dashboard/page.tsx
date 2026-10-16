@@ -217,9 +217,7 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
                       >
                         Edit
                       </Link>
-                      {a.status === "draft" && (
-                        <DeleteButton id={a.id} title={a.title} />
-                      )}
+                      <DeleteButton id={a.id} title={a.title} canDelete={a.status === "draft"} />
                     </div>
                   </td>
                 </tr>
@@ -266,7 +264,7 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
               <div className="admin-auction-card-actions">
                 <Link href={`/lelang/${a.id}`} className="btn-secondary">Lihat</Link>
                 <Link href={`/admin/auction/${a.id}`} className="btn-secondary">Edit</Link>
-                {a.status === "draft" && <DeleteButton id={a.id} title={a.title} />}
+                <DeleteButton id={a.id} title={a.title} canDelete={a.status === "draft"} />
               </div>
             </article>
           ))}
