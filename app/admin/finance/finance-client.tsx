@@ -48,7 +48,10 @@ interface FinanceJournalLine {
 interface FinanceData {
   summary: FinanceSummary;
   transactions: FinanceTransaction[];
+  transactionPagination: { page: number; pageSize: number; total: number; totalPages: number };
   journalLines: FinanceJournalLine[];
+  journalTransactions: { id: string; transaction_date: string; reference: string | null }[];
+  journalPagination: { page: number; pageSize: number; total: number; totalPages: number };
   auctions: FinanceAuction[];
   inventoryCosts: { auction_id: string; purchase_cost: number | string }[];
   sales: { auction_id: string | null; amount: number | string }[];
@@ -93,12 +96,14 @@ export default function FinanceClient() {
   const [historyKind, setHistoryKind] = useState<"all" | FinanceKind>("all");
   const [historyFrom, setHistoryFrom] = useState("");
   const [historyTo, setHistoryTo] = useState("");
+  const [transactionPage, setTransactionPage] = useState(1);
+  const [journalPage, setJournalPage] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/admin/finance", { cache: "no-store" });
+      const response = await fetch(`/api/admin/finance?page=${transactionPage}&journalPage=${journalPage}`, { cache: "no-store" });
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.error || "Gagal memuat data keuangan.");
@@ -109,17 +114,26 @@ export default function FinanceClient() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [transactionPage, journalPage]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    setTransactionPage(1);
+  }, [historySearch, historyKind, historyFrom, historyTo]);
 
   const auctionMap = useMemo(() => {
     const map = new Map<string, FinanceAuction>();
     for (const auction of data?.auctions ?? []) map.set(auction.id, auction);
     return map;
   }, [data?.auctions]);
+
+  const journalTransactionMap = useMemo(
+    () => new Map((data?.journalTransactions ?? []).map((transaction) => [transaction.id, transaction])),
+    [data?.journalTransactions],
+  );
 
   const purchasedIds = useMemo(
     () => new Set((data?.inventoryCosts ?? []).map((item) => item.auction_id)),
@@ -365,7 +379,7 @@ export default function FinanceClient() {
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
               <div>
                 <h2 style={{ fontSize: 20, fontWeight: 850 }}>Riwayat transaksi</h2>
-                <p style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 4 }}>Cari dan saring hingga 100 transaksi terbaru yang dimuat dari server.</p>
+                <p style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 4 }}>Menampilkan halaman {data?.transactionPagination.page ?? 1} dari {data?.transactionPagination.totalPages ?? 1} ({data?.transactionPagination.total ?? 0} transaksi total). Pencarian dan filter berlaku pada halaman yang sedang ditampilkan.</p>
               </div>
               <Link href="/admin/dashboard" className="btn-secondary" style={{ padding: "9px 14px", alignSelf: "start" }}>Kembali ke dashboard</Link>
             </div>
@@ -413,6 +427,13 @@ export default function FinanceClient() {
                 </table>
               </div>
             )}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
+              <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>Halaman {data?.transactionPagination.page ?? 1} / {data?.transactionPagination.totalPages ?? 1}</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn-secondary" type="button" disabled={(data?.transactionPagination.page ?? 1) <= 1 || loading} onClick={() => setTransactionPage((page) => Math.max(1, page - 1))}>Sebelumnya</button>
+                <button className="btn-secondary" type="button" disabled={(data?.transactionPagination.page ?? 1) >= (data?.transactionPagination.totalPages ?? 1) || loading} onClick={() => setTransactionPage((page) => page + 1)}>Berikutnya</button>
+              </div>
+            </div>
           </section>
 
           <section className="admin-finance-section admin-finance-journal" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 22, marginTop: 24 }}>
@@ -437,7 +458,7 @@ export default function FinanceClient() {
                   </thead>
                   <tbody>
                     {data.journalLines.map((line) => {
-                      const transaction = data.transactions.find((item) => item.id === line.transaction_id);
+                      const transaction = journalTransactionMap.get(line.transaction_id);
                       return (
                         <tr key={line.id}>
                           <td style={{ whiteSpace: "nowrap" }}>{transaction?.transaction_date || "—"}</td>
@@ -453,6 +474,13 @@ export default function FinanceClient() {
                 </table>
               </div>
             )}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
+              <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>Halaman {data?.journalPagination.page ?? 1} / {data?.journalPagination.totalPages ?? 1} ({data?.journalPagination.total ?? 0} baris jurnal)</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn-secondary" type="button" disabled={(data?.journalPagination.page ?? 1) <= 1 || loading} onClick={() => setJournalPage((page) => Math.max(1, page - 1))}>Sebelumnya</button>
+                <button className="btn-secondary" type="button" disabled={(data?.journalPagination.page ?? 1) >= (data?.journalPagination.totalPages ?? 1) || loading} onClick={() => setJournalPage((page) => page + 1)}>Berikutnya</button>
+              </div>
+            </div>
           </section>
         </>
       )}
