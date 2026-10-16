@@ -168,7 +168,7 @@ export async function PUT(
   return NextResponse.json({ message: 'Auction updated successfully' });
 }
 
-// ─── DELETE /api/admin/auctions/[id]: Delete auction (draft only) ───────────
+// ─── DELETE /api/admin/auctions/[id]: Delete safe, unreferenced auctions ───────────
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -186,7 +186,7 @@ export async function DELETE(
     return NextResponse.json({ error: adminErr || 'Forbidden' }, { status: 403 });
   }
 
-  // Fetch to verify status — only drafts can be deleted per RLS policy
+  // Fetch to verify status against the RLS policy for removable auction states
   const { data: existing, error: fetchError } = await supabase
     .from('auctions')
     .select('id, status')
