@@ -73,11 +73,20 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
     redirect("/");
   }
 
-  const page = Math.max(1, Number(params.page || "1"));
+  const requestedPage = Number(params.page || "1");
+  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const limit = 12;
   const offset = (page - 1) * limit;
-  const statusFilter = params.status;
-  const sortBy = params.sortBy || "created_at";
+
+  const allowedStatuses = new Set(["draft", "scheduled", "live", "ended", "cancelled"]);
+  const statusFilter = params.status && allowedStatuses.has(params.status) ? params.status : undefined;
+
+  const allowedSortColumns = new Set([
+    "created_at", "updated_at", "title", "status",
+    "starts_at", "ends_at", "starting_price", "current_price",
+  ]);
+  const requestedSort = params.sortBy || "created_at";
+  const sortBy = allowedSortColumns.has(requestedSort) ? requestedSort : "created_at";
   const sortOrder = params.sortOrder === "asc" ? "asc" : "desc";
 
   let query = supabase
