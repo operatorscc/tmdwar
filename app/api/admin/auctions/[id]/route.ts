@@ -200,17 +200,25 @@ export async function DELETE(
     return NextResponse.json({ error: 'Auction not found' }, { status: 404 });
   }
 
-  if (existing.status !== 'draft') {
+  const deletableStatuses = new Set(['draft', 'ended', 'cancelled']);
+  if (!deletableStatuses.has(existing.status)) {
     return NextResponse.json(
-      { error: 'Only draft auctions can be deleted. Use "cancelled" status to retire active auctions.' },
+      { error: 'Lelang berstatus Terjadwal atau Live tidak dapat dihapus. Ubah status menjadi Dibatalkan terlebih dahulu.' },
       { status: 409 }
     );
   }
 
+  // Foreign keys intentionally protect bid history, official results, and finance records.
   const { error: deleteError } = await supabase.from('auctions').delete().eq('id', id);
 
   if (deleteError) {
-    return NextResponse.json({ error: `Failed to delete auction: ${deleteError.message}` }, { status: 500 });
+    if (deleteError.code === '23503') {
+      return NextResponse.json(
+        { error: 'Lelang tidak dapat dihapus karena sudah memiliki riwayat penawaran, hasil lelang, atau transaksi keuangan. Data riwayat tetap dipertahankan.' },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json({ error: `Gagal menghapus lelang: ${deleteError.message}` }, { status: 500 });
   }
 
   return NextResponse.json({ message: 'Auction deleted successfully' });
