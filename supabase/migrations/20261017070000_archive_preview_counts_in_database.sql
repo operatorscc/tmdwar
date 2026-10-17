@@ -35,8 +35,9 @@ begin
       where b.auction_id = p_auction_id
     ),
     'results', (
-      select count(*) from public.auction_results r
-      where r.auction_id = p_auction_id
+      select case when a.winner_bidder_id is not null then 1 else 0 end
+      from public.auctions a
+      where a.id = p_auction_id
     ),
     'transactions', (
       select count(*) from public.finance_transactions t
