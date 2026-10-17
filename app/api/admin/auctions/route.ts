@@ -39,10 +39,6 @@ export async function GET(request: Request) {
   if (statusFilter && !allowedStatuses.has(statusFilter)) {
     return NextResponse.json({ error: 'Filter status lelang tidak valid.' }, { status: 400 });
   }
-  if (statusFilter && archiveMode === 'archived') {
-    return NextResponse.json({ error: 'Filter status tidak dapat digabungkan dengan archive=archived.' }, { status: 400 });
-  }
-
   const allowedSortColumns = new Set([
     'created_at', 'updated_at', 'title', 'status',
     'starts_at', 'ends_at', 'starting_price', 'current_price',
@@ -148,7 +144,7 @@ export async function POST(request: Request) {
       .from('auction-images')
       .upload(path, imageFile, { upsert: false, contentType: imageFile.type });
     if (uploadError) {
-    return NextResponse.json({ error: `Image upload failed: ${uploadError.message}` }, { status: 500 });
+      return NextResponse.json({ error: `Image upload failed: ${uploadError.message}` }, { status: 500 });
     }
     const { data: publicUrlData } = supabase.storage.from('auction-images').getPublicUrl(path);
     imageUrl = publicUrlData?.publicUrl || null;
