@@ -20,17 +20,59 @@ export async function GET(
     return NextResponse.json({ error: adminErr || 'Forbidden' }, { status: 403 });
   }
 
-  const { data, error } = await supabase
+  const requestUrl = new URL(_request.url);
+  if (requestUrl.searchParams.get('archivePreview') === '1') {
+    const { data: preview, error: previewError } = await supabase.rpc('archive_auction_preview', {
+      p_auction_id: id,
+    });
+
+    if (previewError) {
+      const missingRpc = ['42883', 'PGRST202'].includes(previewError.code ?? '');
+      const status = missingRpc ? 503
+        : previewError.message?.includes('Lelang sudah diarsipkan') ? 409
+        : previewError.message?.includes('Lelang tidak ditemukan') ? 404
+        : previewError.code === '42501' ? 403
+        : previewError.code === 'P0001' ? 409
+        : 500;
+      return NextResponse.json({
+        error: missingRpc
+          ? 'Pratinjau arsip belum aktif karena migration RPC pratinjau belum diterapkan pada database. Tidak ada perubahan data yang dilakukan.'
+          : previewError.message || 'Gagal memeriksa dampak arsip.',
+      }, { status });
+    }
+
+    if (!preview || typeof preview !== 'object' || !preview.counts) {
+      return NextResponse.json({ error: 'Respons pratinjau arsip tidak valid.' }, { status: 500 });
+    }
+
+    return NextResponse.json(preview, {
+      headers: { 'Cache-Control': 'no-store, max-age=0' },
+    });
+  }
+
+  let { data, error } = await supabase
     .from('auctions')
-    .select('id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at')
+    .select('id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at, archived_at')
     .eq('id', id)
     .maybeSingle();
 
+  if (error?.code === '42703' && /archived_at/.test(error.message)) {
+    const legacy = await supabase
+      .from('auctions')
+      .select('id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at')
+      .eq('id', id)
+      .maybeSingle();
+    data = legacy.data as typeof data;
+    error = legacy.error;
+  }
   if (error) {
     return NextResponse.json({ error: `Failed to fetch auction: ${error.message}` }, { status: 500 });
   }
   if (!data) {
     return NextResponse.json({ error: 'Auction not found' }, { status: 404 });
+  }
+  if (data.archived_at) {
+    return NextResponse.json({ error: 'Lelang sudah diarsipkan dan tidak dapat diedit.' }, { status: 409 });
   }
 
   return NextResponse.json(data);
@@ -55,17 +97,29 @@ export async function PUT(
   }
 
   // Fetch existing auction to check constraints
-  const { data: existing, error: fetchError } = await supabase
+  let { data: existing, error: fetchError } = await supabase
     .from('auctions')
-    .select('id, status, image_url')
+    .select('id, status, image_url, archived_at')
     .eq('id', id)
     .maybeSingle();
 
+  if (fetchError?.code === '42703' && /archived_at/.test(fetchError.message)) {
+    const legacy = await supabase
+      .from('auctions')
+      .select('id, status, image_url')
+      .eq('id', id)
+      .maybeSingle();
+    existing = legacy.data as typeof existing;
+    fetchError = legacy.error;
+  }
   if (fetchError) {
     return NextResponse.json({ error: `Failed to fetch auction: ${fetchError.message}` }, { status: 500 });
   }
   if (!existing) {
     return NextResponse.json({ error: 'Auction not found' }, { status: 404 });
+  }
+  if (existing.archived_at) {
+    return NextResponse.json({ error: 'Lelang yang sudah diarsipkan tidak dapat diedit.' }, { status: 409 });
   }
 
   let formData: FormData;
@@ -168,58 +222,72 @@ export async function PUT(
   return NextResponse.json({ message: 'Auction updated successfully' });
 }
 
-// ─── DELETE /api/admin/auctions/[id]: Delete safe, unreferenced auctions ───────────
+// ─── DELETE /api/admin/auctions/[id]: Archive auction; never delete history ─────
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
   const { isAdmin, error: adminErr } = await requireAdmin(supabase);
-  if (!isAdmin) {
-    return NextResponse.json({ error: adminErr || 'Forbidden' }, { status: 403 });
+  if (!isAdmin) return NextResponse.json({ error: adminErr || 'Forbidden' }, { status: 403 });
+
+  let body: { confirmTitle?: unknown; reason?: unknown; expectedCounts?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Konfirmasi arsip tidak valid.' }, { status: 400 });
   }
 
-  // Fetch to verify status against the RLS policy for removable auction states
+  const confirmTitle = typeof body.confirmTitle === 'string' ? body.confirmTitle : '';
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+  if (!confirmTitle.trim() || !reason || reason.length > 1000) {
+    return NextResponse.json({ error: 'Nama lelang untuk konfirmasi dan alasan arsip wajib diisi (maksimal 1.000 karakter).' }, { status: 400 });
+  }
+  const expectedCounts = body.expectedCounts;
+  if (!expectedCounts || typeof expectedCounts !== 'object' || Array.isArray(expectedCounts)) {
+    return NextResponse.json({ error: 'Pratinjau dampak arsip wajib dikirim. Muat ulang dan coba lagi.' }, { status: 400 });
+  }
+
   const { data: existing, error: fetchError } = await supabase
     .from('auctions')
-    .select('id, status')
+    .select('id, title, status, archived_at')
     .eq('id', id)
     .maybeSingle();
 
-  if (fetchError) {
-    return NextResponse.json({ error: `Failed to fetch auction: ${fetchError.message}` }, { status: 500 });
+  if (fetchError?.code === '42703' && /archived_at/.test(fetchError.message)) {
+    return NextResponse.json({
+      error: 'Pengarsipan belum dapat dijalankan: migration arsip belum diterapkan pada database. Tidak ada perubahan data yang dilakukan.'
+    }, { status: 503 });
   }
-  if (!existing) {
-    return NextResponse.json({ error: 'Auction not found' }, { status: 404 });
-  }
-
-  const deletableStatuses = new Set(['draft', 'ended', 'cancelled']);
-  if (!deletableStatuses.has(existing.status)) {
-    return NextResponse.json(
-      { error: 'Lelang berstatus Terjadwal atau Live tidak dapat dihapus. Ubah status menjadi Dibatalkan terlebih dahulu.' },
-      { status: 409 }
-    );
+  if (fetchError) return NextResponse.json({ error: `Gagal memeriksa lelang: ${fetchError.message}` }, { status: 500 });
+  if (!existing) return NextResponse.json({ error: 'Lelang tidak ditemukan.' }, { status: 404 });
+  if (existing.archived_at) return NextResponse.json({ error: 'Lelang sudah diarsipkan.' }, { status: 409 });
+  if (confirmTitle !== existing.title) {
+    return NextResponse.json({ error: 'Nama lelang berubah sejak konfirmasi. Muat ulang dan periksa kembali dampaknya.' }, { status: 409 });
   }
 
-  // Foreign keys intentionally protect bid history, official results, and finance records.
-  const { error: deleteError } = await supabase.from('auctions').delete().eq('id', id);
+  // The database RPC locks the auction row, rechecks the preview counts, and archives atomically.
+  const { data: archiveResult, error: archiveError } = await supabase.rpc('archive_auction', {
+    p_auction_id: id,
+    p_confirm_title: confirmTitle,
+    p_reason: reason,
+    p_expected_counts: expectedCounts,
+  });
 
-  if (deleteError) {
-    if (deleteError.code === '23503') {
-      return NextResponse.json(
-        { error: 'Lelang tidak dapat dihapus karena sudah memiliki riwayat penawaran, hasil lelang, atau transaksi keuangan. Data riwayat tetap dipertahankan.' },
-        { status: 409 }
-      );
-    }
-    return NextResponse.json({ error: `Gagal menghapus lelang: ${deleteError.message}` }, { status: 500 });
+  if (archiveError) {
+    const status = ['P0001', '23514'].includes(archiveError.code ?? '') ? 409 : 500;
+    return NextResponse.json({ error: archiveError.message || 'Gagal mengarsipkan lelang.' }, { status });
   }
 
-  return NextResponse.json({ message: 'Auction deleted successfully' });
+  return NextResponse.json({
+    message: 'Lelang berhasil diarsipkan. Riwayat penawaran, hasil, transaksi, jurnal, dan biaya tetap dipertahankan.',
+    archived: true,
+    status: archiveResult?.status,
+    counts: archiveResult?.counts,
+  });
 }

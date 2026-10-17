@@ -16,6 +16,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const { data: auction } = await supabase
       .from("auctions")
       .select("title, description")
+      .is("archived_at", null)
       .eq("id", id)
       .maybeSingle();
 
@@ -45,16 +46,33 @@ export default async function AuctionDetailPage({ params }: PageProps) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: auctionData, error: auctionError } = await supabase
+  const archiveAwareResult = await supabase
     .from("auctions")
-    .select("id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at")
+    .select("id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at, archived_at")
     .eq("id", id)
+    .is("archived_at", null)
     .maybeSingle();
+
+  // Keep detail pages working on preview deployments before the archive migration.
+  // Only retry when PostgreSQL explicitly says the archive column does not exist.
+  const legacyResult =
+    archiveAwareResult.error?.code === "42703" &&
+    /archived_at/.test(archiveAwareResult.error.message)
+      ? await supabase
+          .from("auctions")
+          .select("id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at")
+          .eq("id", id)
+          .maybeSingle()
+      : null;
+
+  const auctionError = legacyResult ? legacyResult.error : archiveAwareResult.error;
+  const auctionData = legacyResult ? legacyResult.data : archiveAwareResult.data;
 
   if (auctionError || !auctionData) {
     notFound();
   }
 
+  // Archived rows are excluded by the archive-aware query and by RLS after migration.
   const auction = auctionData as unknown as Auction;
   if (!["scheduled", "live", "ended", "cancelled"].includes(auction.status)) {
     notFound();
