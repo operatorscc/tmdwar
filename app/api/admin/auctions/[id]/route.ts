@@ -52,7 +52,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from('auctions')
-    .select('id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at')
+    .select('id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at, archived_at')
     .eq('id', id)
     .maybeSingle();
 
@@ -61,6 +61,9 @@ export async function GET(
   }
   if (!data) {
     return NextResponse.json({ error: 'Auction not found' }, { status: 404 });
+  }
+  if (data.archived_at) {
+    return NextResponse.json({ error: 'Lelang sudah diarsipkan dan tidak dapat diedit.' }, { status: 409 });
   }
 
   return NextResponse.json(data);
