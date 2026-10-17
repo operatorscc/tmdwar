@@ -31,6 +31,10 @@ begin
 end
 $archive_constraint$;
 
+-- Archiving replaces permanent deletion: remove the old RLS delete policy and table privilege.
+drop policy if exists "Admins can delete removable auctions" on public.auctions;
+revoke delete on table public.auctions from anon, authenticated;
+
 -- Public users cannot read archived lots, while admins retain access to manage the archive.
 drop policy if exists "Public can read published auctions" on public.auctions;
 create policy "Public can read published auctions"
