@@ -8,7 +8,7 @@ import DeleteButton from "./delete-button";
 
 export const metadata: Metadata = {
   title: "Dashboard Admin — TMD-WAR",
-  description: "Kelola semua lot lelang: lihat, edit, dan hapus.",
+  description: "Kelola lelang dan arsip tanpa menghapus riwayat penawaran atau keuangan.",
 };
 
 interface AdminAuction {
