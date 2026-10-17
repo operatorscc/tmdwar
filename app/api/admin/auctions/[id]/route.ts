@@ -42,13 +42,34 @@ export async function GET(
       return count ?? 0;
     };
     try {
-      const [bids, results, transactions, journalLines, inventoryCosts] = await Promise.all([
+      const [bids, results, transactionRows, inventoryCosts, directJournalRows] = await Promise.all([
         countFor('bids'),
         countFor('auction_results'),
-        countFor('finance_transactions'),
-        countFor('finance_journal_lines'),
+        supabase.from('finance_transactions').select('id').eq('auction_id', id),
         countFor('finance_inventory_costs'),
+        supabase.from('finance_journal_lines').select('id').eq('auction_id', id),
       ]);
+      if (transactionRows.error) throw new Error(`Gagal menghitung transaksi keuangan: ${transactionRows.error.message}`);
+      if (directJournalRows.error) throw new Error(`Gagal menghitung baris jurnal: ${directJournalRows.error.message}`);
+
+      const transactionIds = (transactionRows.data ?? []).map((row) => row.id);
+      let parentJournalRows: { id: number }[] = [];
+      if (transactionIds.length > 0) {
+        const { data, error } = await supabase
+          .from('finance_journal_lines')
+          .select('id')
+          .in('transaction_id', transactionIds);
+        if (error) throw new Error(`Gagal menghitung baris jurnal melalui transaksi: ${error.message}`);
+        parentJournalRows = data ?? [];
+      }
+
+      // Count the union, not the sum: a journal line may match both paths.
+      const journalLineIds = new Set([
+        ...(directJournalRows.data ?? []).map((row) => row.id),
+        ...parentJournalRows.map((row) => row.id),
+      ]);
+      const transactions = transactionIds.length;
+      const journalLines = journalLineIds.size;
       return NextResponse.json({ title: auction.title, status: auction.status, counts: { bids, results, transactions, journalLines, inventoryCosts } });
     } catch (error) {
       return NextResponse.json({ error: error instanceof Error ? error.message : 'Gagal memeriksa dampak arsip.' }, { status: 500 });
