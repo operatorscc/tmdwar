@@ -24,6 +24,8 @@ interface AdminAuction {
   image_url: string | null;
   created_at: string;
   updated_at: string;
+  archived_at: string | null;
+  archive_reason: string | null;
 }
 
 interface PageProps {
@@ -32,6 +34,7 @@ interface PageProps {
     status?: string;
     sortBy?: string;
     sortOrder?: string;
+    archived?: string;
   }>;
 }
 
@@ -77,16 +80,18 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
   const limit = 12;
   const offset = (page - 1) * limit;
   const statusFilter = params.status;
+  const showArchived = params.archived === "1";
   const sortBy = params.sortBy || "created_at";
   const sortOrder = params.sortOrder === "asc" ? "asc" : "desc";
 
   let query = supabase
     .from("auctions")
-    .select("id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at", { count: "exact" })
+    .select("id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at, archived_at, archive_reason", { count: "exact" })
     .order(sortBy, { ascending: sortOrder === "asc" })
     .range(offset, offset + limit - 1);
 
-  if (statusFilter) {
+  query = showArchived ? query.not("archived_at", "is", null) : query.is("archived_at", null);
+  if (statusFilter && !showArchived) {
     query = query.eq("status", statusFilter);
   }
 
@@ -114,10 +119,13 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
             Dashboard Lelang
           </h1>
           <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 6 }}>
-            Total {total} lot terdaftar. Kelola, edit, atau hapus lot lelang.
+            {showArchived ? "Arsip lelang" : "Lelang aktif dan historis"}: {total} lot. Data arsip tetap tersimpan dan tidak menghapus jurnal keuangan.
           </p>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Link href={showArchived ? "/admin/dashboard" : "/admin/dashboard?archived=1"} className="btn-secondary" style={{ padding: "12px 20px" }}>
+            {showArchived ? "Kembali ke Daftar Lelang" : "Lihat Arsip Lelang"}
+          </Link>
           <Link href="/admin/finance" className="btn-secondary" style={{ padding: "12px 20px" }}>
             Keuangan & Akuntansi
           </Link>
@@ -134,7 +142,7 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
       )}
 
       {/* Filters */}
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
+      {!showArchived && <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
         <Link href={buildUrl({ status: undefined, page: undefined })} className={`filter-tab ${!statusFilter ? "active" : ""}`}>
           Semua
         </Link>
@@ -143,7 +151,9 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
             {STATUS_LABELS[s]}
           </Link>
         ))}
-      </div>
+      </div>}
+
+      {showArchived && <p style={{ marginBottom: 20, color: "var(--text-secondary)", fontSize: 13 }}>Arsip tidak tampil di katalog publik. Riwayat penawaran, hasil lelang, transaksi, jurnal, dan biaya tetap dipertahankan.</p>}
 
       {/* Table */}
       {auctions.length > 0 ? (
@@ -203,21 +213,21 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
                   </td>
                   <td style={{ textAlign: "center" }}>
                     <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
-                      <Link
+                      {!showArchived && <Link
                         href={`/lelang/${a.id}`}
                         className="btn-secondary"
                         style={{ padding: "5px 10px", fontSize: 11 }}
                       >
                         Lihat
-                      </Link>
-                      <Link
+                      </Link>}
+                      {!showArchived && <Link
                         href={`/admin/auction/${a.id}`}
                         className="btn-secondary"
                         style={{ padding: "5px 10px", fontSize: 11 }}
                       >
                         Edit
-                      </Link>
-                      <DeleteButton id={a.id} title={a.title} canDelete={["draft", "ended", "cancelled"].includes(a.status)} />
+                      </Link>}
+                      {showArchived ? <span className="filter-tab active">Diarsipkan</span> : <DeleteButton id={a.id} title={a.title} />}
                     </div>
                   </td>
                 </tr>
@@ -262,9 +272,10 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
               </div>
 
               <div className="admin-auction-card-actions">
-                <Link href={`/lelang/${a.id}`} className="btn-secondary">Lihat</Link>
+                {!showArchived && <><Link href={`/lelang/${a.id}`} className="btn-secondary">Lihat</Link>
                 <Link href={`/admin/auction/${a.id}`} className="btn-secondary">Edit</Link>
-                <DeleteButton id={a.id} title={a.title} canDelete={["draft", "ended", "cancelled"].includes(a.status)} />
+                <DeleteButton id={a.id} title={a.title} /></>}
+                {showArchived && <span className="filter-tab active">Diarsipkan</span>}
               </div>
             </article>
           ))}
@@ -273,14 +284,14 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
       ) : (
         <div className="empty-box">
           <div style={{ fontSize: 32, color: "var(--gold)", marginBottom: 8 }}>◈</div>
-          <h3 className="empty-title">Belum Ada Lelang</h3>
+          <h3 className="empty-title">{showArchived ? "Belum Ada Arsip" : "Belum Ada Lelang"}</h3>
           <p className="empty-desc">
-            Belum ada lot lelang yang sesuai dengan filter ini. Buat lelang baru untuk memulai.
+            {showArchived ? "Belum ada lelang yang diarsipkan." : "Belum ada lot lelang yang sesuai dengan filter ini. Buat lelang baru untuk memulai."}
           </p>
           <div style={{ marginTop: 20 }}>
-            <Link href="/admin/auction" className="btn-primary">
+            {!showArchived && <Link href="/admin/auction" className="btn-primary">
               + Buat Lelang Baru
-            </Link>
+            </Link>}
           </div>
         </div>
       )}
