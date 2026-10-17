@@ -95,7 +95,29 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
     query = query.eq("status", statusFilter);
   }
 
-  const { data: auctionsData, error, count } = await query;
+  let { data: auctionsData, error, count } = await query;
+  let archiveSchemaUnavailable = false;
+
+  // Keep the existing admin dashboard usable while a preview is connected to a
+  // database that has not received the archive migration yet.
+  if (error?.code === "42703" && /archived_at|archive_reason/.test(error.message)) {
+    archiveSchemaUnavailable = true;
+    if (showArchived) {
+      auctionsData = [];
+      count = 0;
+      error = null;
+    } else {
+      const legacyResult = await supabase
+        .from("auctions")
+        .select("id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at", { count: "exact" })
+        .order(sortBy, { ascending: sortOrder === "asc" })
+        .range(offset, offset + limit - 1);
+      auctionsData = legacyResult.data as typeof auctionsData;
+      error = legacyResult.error;
+      count = legacyResult.count;
+    }
+  }
+
   const auctions = (auctionsData ?? []) as unknown as AdminAuction[];
   const total = count ?? 0;
   const totalPages = Math.ceil(total / limit);
@@ -134,6 +156,12 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
           </Link>
         </div>
       </div>
+
+      {archiveSchemaUnavailable && (
+        <div className="alert-error" style={{ marginBottom: 24 }}>
+          <strong>Skema arsip belum diterapkan.</strong> Daftar lelang biasa tetap tersedia, tetapi fitur melihat dan mengelola arsip belum aktif sampai migration arsip diterapkan ke database.
+        </div>
+      )}
 
       {error && (
         <div className="alert-error" style={{ marginBottom: 24 }}>
