@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { validateAuctionInput, validateImage, generateStoragePath, requireAdmin } from '@/lib/validation';
 
-// ─── GET: List auctions (admin sees all, including drafts) ───────────────────
+// GET: Admin-only list with explicit archive scope. Operational lists exclude archived lots by default.
 export async function GET(request: Request) {
   const supabase = await createClient();
 
@@ -30,9 +30,17 @@ export async function GET(request: Request) {
   const limit = Math.min(100, limitValue);
   const offset = (page - 1) * limit;
   const statusFilter = searchParams.get('status');
+  const archiveMode = searchParams.get('archive') || 'active';
+  if (!['active', 'archived', 'all'].includes(archiveMode)) {
+    return NextResponse.json({ error: 'Parameter archive harus active, archived, atau all.' }, { status: 400 });
+  }
+
   const allowedStatuses = new Set(['draft', 'scheduled', 'live', 'ended', 'cancelled']);
   if (statusFilter && !allowedStatuses.has(statusFilter)) {
     return NextResponse.json({ error: 'Filter status lelang tidak valid.' }, { status: 400 });
+  }
+  if (statusFilter && archiveMode === 'archived') {
+    return NextResponse.json({ error: 'Filter status tidak dapat digabungkan dengan archive=archived.' }, { status: 400 });
   }
 
   const allowedSortColumns = new Set([
@@ -45,10 +53,15 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from('auctions')
-    .select('id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at', { count: 'exact' })
+    .select('id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at, archived_at, archive_reason', { count: 'exact' })
     .order(sortBy, { ascending: sortOrder === 'asc' })
     .range(offset, offset + limit - 1);
 
+  if (archiveMode === 'active') {
+    query = query.is('archived_at', null);
+  } else if (archiveMode === 'archived') {
+    query = query.not('archived_at', 'is', null);
+  }
   if (statusFilter) {
     query = query.eq('status', statusFilter);
   }
@@ -56,7 +69,8 @@ export async function GET(request: Request) {
   const { data, error, count } = await query;
 
   if (error) {
-    return NextResponse.json({ error: `Failed to fetch auctions: ${error.message}` }, { status: 500 });
+    // Do not silently return an incomplete list when archive columns are missing.
+    return NextResponse.json({ error: 'Gagal memuat lelang. Pastikan migration arsip sudah diterapkan.' }, { status: 500 });
   }
 
   return NextResponse.json({
@@ -65,10 +79,11 @@ export async function GET(request: Request) {
     page,
     limit,
     totalPages: Math.ceil((count ?? 0) / limit),
+    archive: archiveMode,
   });
 }
 
-// ─── POST: Create auction (admin only) ──────────────────────────────────────
+// POST: Create auction (admin only)
 export async function POST(request: Request) {
   const supabase = await createClient();
 
@@ -120,7 +135,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: imageValidation.error }, { status: 400 });
   }
 
-  // Image upload handling
   let imageUrl: string | null = null;
   if (imageFile && imageFile.size > 0) {
     const path = generateStoragePath(imageFile);
@@ -128,7 +142,7 @@ export async function POST(request: Request) {
       .from('auction-images')
       .upload(path, imageFile, { upsert: false, contentType: imageFile.type });
     if (uploadError) {
-      return NextResponse.json({ error: `Image upload failed: ${uploadError.message}` }, { status: 500 });
+    return NextResponse.json({ error: `Image upload failed: ${uploadError.message}` }, { status: 500 });
     }
     const { data: publicUrlData } = supabase.storage.from('auction-images').getPublicUrl(path);
     imageUrl = publicUrlData?.publicUrl || null;
