@@ -3,6 +3,7 @@ import "./globals.css";
 import { createClient } from "@/lib/supabase/server";
 import { Navbar, type NavUser } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { PostHogAnalytics } from "./PostHogAnalytics";
 
 export const metadata: Metadata = {
   title: "TMD-WAR — Platform Lelang Online & House of Curated Auctions",
@@ -61,6 +62,7 @@ export default async function RootLayout({
   return (
     <html lang="id">
       <body>
+        <PostHogAnalytics />
         <Navbar user={navUser} />
         <main>{children}</main>
         <Footer />
