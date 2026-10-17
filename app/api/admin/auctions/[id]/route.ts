@@ -27,6 +27,11 @@ export async function GET(
       .select('id, title, status, archived_at')
       .eq('id', id)
       .maybeSingle();
+    if (previewError?.code === '42703' && /archived_at/.test(previewError.message)) {
+      return NextResponse.json({
+        error: 'Fitur arsip belum aktif karena migration arsip belum diterapkan pada database yang dipakai preview. Daftar lelang tetap tersedia, tetapi pengarsipan dinonaktifkan sampai skema database diperbarui.'
+      }, { status: 503 });
+    }
     if (previewError) return NextResponse.json({ error: previewError.message }, { status: 500 });
     if (!auction) return NextResponse.json({ error: 'Auction not found' }, { status: 404 });
     if (auction.archived_at) return NextResponse.json({ error: 'Lelang sudah diarsipkan.' }, { status: 409 });
@@ -50,12 +55,21 @@ export async function GET(
     }
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('auctions')
     .select('id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at, archived_at')
     .eq('id', id)
     .maybeSingle();
 
+  if (error?.code === '42703' && /archived_at/.test(error.message)) {
+    const legacy = await supabase
+      .from('auctions')
+      .select('id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at')
+      .eq('id', id)
+      .maybeSingle();
+    data = legacy.data as typeof data;
+    error = legacy.error;
+  }
   if (error) {
     return NextResponse.json({ error: `Failed to fetch auction: ${error.message}` }, { status: 500 });
   }
@@ -88,12 +102,21 @@ export async function PUT(
   }
 
   // Fetch existing auction to check constraints
-  const { data: existing, error: fetchError } = await supabase
+  let { data: existing, error: fetchError } = await supabase
     .from('auctions')
     .select('id, status, image_url, archived_at')
     .eq('id', id)
     .maybeSingle();
 
+  if (fetchError?.code === '42703' && /archived_at/.test(fetchError.message)) {
+    const legacy = await supabase
+      .from('auctions')
+      .select('id, status, image_url')
+      .eq('id', id)
+      .maybeSingle();
+    existing = legacy.data as typeof existing;
+    fetchError = legacy.error;
+  }
   if (fetchError) {
     return NextResponse.json({ error: `Failed to fetch auction: ${fetchError.message}` }, { status: 500 });
   }
@@ -241,6 +264,11 @@ export async function DELETE(
     .eq('id', id)
     .maybeSingle();
 
+  if (fetchError?.code === '42703' && /archived_at/.test(fetchError.message)) {
+    return NextResponse.json({
+      error: 'Pengarsipan belum dapat dijalankan: migration arsip belum diterapkan pada database. Tidak ada perubahan data yang dilakukan.'
+    }, { status: 503 });
+  }
   if (fetchError) return NextResponse.json({ error: `Gagal memeriksa lelang: ${fetchError.message}` }, { status: 500 });
   if (!existing) return NextResponse.json({ error: 'Lelang tidak ditemukan.' }, { status: 404 });
   if (existing.archived_at) return NextResponse.json({ error: 'Lelang sudah diarsipkan.' }, { status: 409 });
