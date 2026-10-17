@@ -111,11 +111,12 @@ begin
     raise exception 'Nama lelang berubah sejak konfirmasi. Muat ulang dan periksa kembali dampaknya.';
   end if;
 
-  -- Serialize against finance operations that lock the sale transaction row.
-  perform 1
-    from public.finance_transactions
-    where auction_id = p_auction_id
-    for update;
+  -- Do not lock finance_transactions rows here: receipt processing locks a sale row
+  -- before its finance trigger locks the auction, so taking row locks in the reverse
+  -- order can deadlock. The finance-history triggers take FOR SHARE on this auction.
+  -- This FOR UPDATE lock therefore serializes archive against financial writes without
+  -- acquiring child-row locks in the opposite order: an in-flight write finishes first,
+  -- or it wakes after archive and is rejected by the archived-auction guard.
 
   select jsonb_build_object(
     'bids', (select count(*) from public.bids where auction_id = p_auction_id),
