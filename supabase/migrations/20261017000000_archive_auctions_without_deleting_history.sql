@@ -29,6 +29,26 @@ create policy "Public can read published auctions"
     or public.is_admin()
   );
 
+-- The public bid-feed view bypasses underlying RLS by design, so explicitly hide archived lots here too.
+create or replace view public.public_bid_feed
+with (security_invoker = false)
+as
+select
+  b.id,
+  b.auction_id,
+  b.amount,
+  b.created_at,
+  'Peserta #' || dense_rank() over (
+    partition by b.auction_id
+    order by b.bidder_id
+  )::text as bidder_name
+from public.bids b
+join public.auctions a on a.id = b.auction_id
+where a.archived_at is null
+  and a.status in ('scheduled', 'live', 'ended');
+
+grant select on public.public_bid_feed to anon, authenticated;
+
 -- Never delete bids, results, transactions, journal lines, or inventory costs via archiving.
 -- RLS update permission remains restricted to admins by the existing policy.
 commit;
