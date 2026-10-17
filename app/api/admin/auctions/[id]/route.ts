@@ -42,34 +42,43 @@ export async function GET(
       return count ?? 0;
     };
     try {
-      const [bids, results, transactionRows, inventoryCosts, directJournalRows] = await Promise.all([
+      const [bids, results, transactionRows, directInventoryRows, directJournalRows] = await Promise.all([
         countFor('bids'),
         countFor('auction_results'),
         supabase.from('finance_transactions').select('id').eq('auction_id', id),
-        countFor('finance_inventory_costs'),
+        supabase.from('finance_inventory_costs').select('id').eq('auction_id', id),
         supabase.from('finance_journal_lines').select('id').eq('auction_id', id),
       ]);
       if (transactionRows.error) throw new Error(`Gagal menghitung transaksi keuangan: ${transactionRows.error.message}`);
+      if (directInventoryRows.error) throw new Error(`Gagal menghitung biaya inventaris: ${directInventoryRows.error.message}`);
       if (directJournalRows.error) throw new Error(`Gagal menghitung baris jurnal: ${directJournalRows.error.message}`);
 
       const transactionIds = (transactionRows.data ?? []).map((row) => row.id);
       let parentJournalRows: { id: number }[] = [];
+      let parentInventoryRows: { id: string }[] = [];
       if (transactionIds.length > 0) {
-        const { data, error } = await supabase
-          .from('finance_journal_lines')
-          .select('id')
-          .in('transaction_id', transactionIds);
-        if (error) throw new Error(`Gagal menghitung baris jurnal melalui transaksi: ${error.message}`);
-        parentJournalRows = data ?? [];
+        const [journalResult, inventoryResult] = await Promise.all([
+          supabase.from('finance_journal_lines').select('id').in('transaction_id', transactionIds),
+          supabase.from('finance_inventory_costs').select('id').in('transaction_id', transactionIds),
+        ]);
+        if (journalResult.error) throw new Error(`Gagal menghitung baris jurnal melalui transaksi: ${journalResult.error.message}`);
+        if (inventoryResult.error) throw new Error(`Gagal menghitung biaya inventaris melalui transaksi: ${inventoryResult.error.message}`);
+        parentJournalRows = journalResult.data ?? [];
+        parentInventoryRows = inventoryResult.data ?? [];
       }
 
-      // Count the union, not the sum: a journal line may match both paths.
+      // Count each record once, even if both its direct and parent links match.
       const journalLineIds = new Set([
         ...(directJournalRows.data ?? []).map((row) => row.id),
         ...parentJournalRows.map((row) => row.id),
       ]);
+      const inventoryCostIds = new Set([
+        ...(directInventoryRows.data ?? []).map((row) => row.id),
+        ...parentInventoryRows.map((row) => row.id),
+      ]);
       const transactions = transactionIds.length;
       const journalLines = journalLineIds.size;
+      const inventoryCosts = inventoryCostIds.size;
       return NextResponse.json({ title: auction.title, status: auction.status, counts: { bids, results, transactions, journalLines, inventoryCosts } });
     } catch (error) {
       return NextResponse.json({ error: error instanceof Error ? error.message : 'Gagal memeriksa dampak arsip.' }, { status: 500 });
