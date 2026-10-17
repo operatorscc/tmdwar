@@ -188,7 +188,7 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
                           TMD
                         </div>
                       )}
-                      <div><span style={{ fontWeight: 600 }}>{a.title}</span>{showArchived && a.archive_reason && <div style={{ marginTop: 4, fontSize: 11, color: "var(--text-muted)" }}>Alasan arsip: {a.archive_reason}</div>}</div>
+                      <div><span style={{ fontWeight: 600 }}>{a.title}</span>{showArchived && <div style={{ marginTop: 4, fontSize: 11, color: "var(--text-muted)" }}>Diarsipkan: {a.archived_at ? formatDateWIB(a.archived_at) : "—"}{a.archive_reason ? ` · Alasan: ${a.archive_reason}` : ""}</div>}</div>
                     </div>
                   </td>
                   <td>
@@ -247,7 +247,7 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
                   <div className="admin-auction-card-image" style={{ display: "grid", placeItems: "center", color: "var(--gold)", fontSize: 11, fontWeight: 900 }}>TMD</div>
                 )}
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className="admin-auction-card-title">{a.title}</div>{showArchived && a.archive_reason && <div className="admin-auction-card-meta">Alasan arsip: {a.archive_reason}</div>}
+                  <div className="admin-auction-card-title">{a.title}</div>{showArchived && <div className="admin-auction-card-meta">Diarsipkan: {a.archived_at ? formatDateWIB(a.archived_at) : "—"}{a.archive_reason ? ` · Alasan: ${a.archive_reason}` : ""}</div>}
                   <div className="admin-auction-card-meta">
                     <span style={{ color: STATUS_COLORS[a.status] || "var(--text-secondary)", fontWeight: 800 }}>
                       {STATUS_LABELS[a.status] || a.status}
