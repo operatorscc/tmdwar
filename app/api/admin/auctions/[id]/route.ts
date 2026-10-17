@@ -87,7 +87,7 @@ export async function PUT(
   // Fetch existing auction to check constraints
   const { data: existing, error: fetchError } = await supabase
     .from('auctions')
-    .select('id, status, image_url')
+    .select('id, status, image_url, archived_at')
     .eq('id', id)
     .maybeSingle();
 
@@ -96,6 +96,9 @@ export async function PUT(
   }
   if (!existing) {
     return NextResponse.json({ error: 'Auction not found' }, { status: 404 });
+  }
+  if (existing.archived_at) {
+    return NextResponse.json({ error: 'Lelang yang sudah diarsipkan tidak dapat diedit.' }, { status: 409 });
   }
 
   let formData: FormData;
@@ -241,7 +244,7 @@ export async function DELETE(
   // Archive is reversible only by a deliberate admin workflow; no child rows are deleted.
   // Active auctions are cancelled in the same UPDATE so place_bid rejects further bids.
   const nextStatus = ['scheduled', 'live'].includes(existing.status) ? 'cancelled' : existing.status;
-  const { error: archiveError } = await supabase
+  const { data: archivedRow, error: archiveError } = await supabase
     .from('auctions')
     .update({
       archived_at: new Date().toISOString(),
@@ -251,12 +254,16 @@ export async function DELETE(
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
-    .is('archived_at', null);
+    .is('archived_at', null)
+    .select('id')
+    .maybeSingle();
 
   if (archiveError) {
     if (archiveError.code === '23514') return NextResponse.json({ error: archiveError.message }, { status: 409 });
     return NextResponse.json({ error: `Gagal mengarsipkan lelang: ${archiveError.message}` }, { status: 500 });
   }
+
+  if (!archivedRow) return NextResponse.json({ error: 'Lelang sudah diarsipkan atau berubah. Muat ulang daftar.' }, { status: 409 });
 
   return NextResponse.json({
     message: 'Lelang berhasil diarsipkan. Riwayat penawaran, hasil, transaksi, jurnal, dan biaya tetap dipertahankan.',
