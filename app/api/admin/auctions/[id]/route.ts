@@ -27,13 +27,15 @@ export async function GET(
     });
 
     if (previewError) {
-      const status = ['P0001', '42501'].includes(previewError.code ?? '') ? 403
-        : previewError.code === '42883' ? 503
+      const missingRpc = ['42883', 'PGRST202'].includes(previewError.code ?? '');
+      const status = missingRpc ? 503
         : previewError.message?.includes('Lelang sudah diarsipkan') ? 409
         : previewError.message?.includes('Lelang tidak ditemukan') ? 404
+        : previewError.code === '42501' ? 403
+        : previewError.code === 'P0001' ? 409
         : 500;
       return NextResponse.json({
-        error: previewError.code === '42883'
+        error: missingRpc
           ? 'Pratinjau arsip belum aktif karena migration RPC pratinjau belum diterapkan pada database. Tidak ada perubahan data yang dilakukan.'
           : previewError.message || 'Gagal memeriksa dampak arsip.',
       }, { status });
