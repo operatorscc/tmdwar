@@ -43,12 +43,13 @@ describe("Auction archive safety contract", () => {
 
   it("protects archived finance history and blocks permanent deletion or archive metadata tampering", () => {
     const transactionGuard = migration("20261017010000_block_finance_changes_for_archived_auctions.sql");
-    const journalGuard = migration("20261017030000_guard_journal_lines_by_parent_transaction.sql");
+    const financeGuard = migration("20261017020000_harden_archived_finance_history.sql");
     assert.match(immutableSql, /Penghapusan permanen lelang dinonaktifkan/i);
     assert.match(immutableSql, /tidak dapat diubah atau dipulihkan/i);
     assert.match(transactionGuard, /before insert or update on public\.finance_transactions/i);
-    assert.match(journalGuard, /before insert or delete or update on public\.finance_journal_lines/i);
-    assert.match(inventoryCountSql, /before insert or delete or update on public\.finance_inventory_costs/i);
+    assert.match(financeGuard, /before insert or update or delete on public\.finance_transactions/i);
+    assert.match(financeGuard, /before insert or update or delete on public\.finance_journal_lines/i);
+    assert.match(financeGuard, /before insert or update or delete on public\.finance_inventory_costs/i);
   });
 
   it("requires the admin API to verify preview counts and a non-empty archive reason", () => {
