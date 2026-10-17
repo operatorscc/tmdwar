@@ -218,7 +218,7 @@ export async function DELETE(
   const { isAdmin, error: adminErr } = await requireAdmin(supabase);
   if (!isAdmin) return NextResponse.json({ error: adminErr || 'Forbidden' }, { status: 403 });
 
-  let body: { confirmTitle?: unknown; reason?: unknown };
+  let body: { confirmTitle?: unknown; reason?: unknown; expectedCounts?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -229,6 +229,10 @@ export async function DELETE(
   const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
   if (!confirmTitle.trim() || !reason || reason.length > 1000) {
     return NextResponse.json({ error: 'Nama lelang untuk konfirmasi dan alasan arsip wajib diisi (maksimal 1.000 karakter).' }, { status: 400 });
+  }
+  const expectedCounts = body.expectedCounts;
+  if (!expectedCounts || typeof expectedCounts !== 'object' || Array.isArray(expectedCounts)) {
+    return NextResponse.json({ error: 'Pratinjau dampak arsip wajib dikirim. Muat ulang dan coba lagi.' }, { status: 400 });
   }
 
   const { data: existing, error: fetchError } = await supabase
@@ -244,33 +248,23 @@ export async function DELETE(
     return NextResponse.json({ error: 'Nama lelang berubah sejak konfirmasi. Muat ulang dan periksa kembali dampaknya.' }, { status: 409 });
   }
 
-  // Archive is reversible only by a deliberate admin workflow; no child rows are deleted.
-  // Active auctions are cancelled in the same UPDATE so place_bid rejects further bids.
-  const nextStatus = ['scheduled', 'live'].includes(existing.status) ? 'cancelled' : existing.status;
-  const { data: archivedRow, error: archiveError } = await supabase
-    .from('auctions')
-    .update({
-      archived_at: new Date().toISOString(),
-      archived_by: user.id,
-      archive_reason: reason,
-      status: nextStatus,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-    .is('archived_at', null)
-    .select('id')
-    .maybeSingle();
+  // The database RPC locks the auction row, rechecks the preview counts, and archives atomically.
+  const { data: archiveResult, error: archiveError } = await supabase.rpc('archive_auction', {
+    p_auction_id: id,
+    p_confirm_title: confirmTitle,
+    p_reason: reason,
+    p_expected_counts: expectedCounts,
+  });
 
   if (archiveError) {
-    if (archiveError.code === '23514') return NextResponse.json({ error: archiveError.message }, { status: 409 });
-    return NextResponse.json({ error: `Gagal mengarsipkan lelang: ${archiveError.message}` }, { status: 500 });
+    const status = ['P0001', '23514'].includes(archiveError.code ?? '') ? 409 : 500;
+    return NextResponse.json({ error: archiveError.message || 'Gagal mengarsipkan lelang.' }, { status });
   }
-
-  if (!archivedRow) return NextResponse.json({ error: 'Lelang sudah diarsipkan atau berubah. Muat ulang daftar.' }, { status: 409 });
 
   return NextResponse.json({
     message: 'Lelang berhasil diarsipkan. Riwayat penawaran, hasil, transaksi, jurnal, dan biaya tetap dipertahankan.',
     archived: true,
-    status: nextStatus,
+    status: archiveResult?.status,
+    counts: archiveResult?.counts,
   });
 }
