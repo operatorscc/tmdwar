@@ -16,6 +16,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const { data: auction } = await supabase
       .from("auctions")
       .select("title, description")
+      .is("archived_at", null)
       .eq("id", id)
       .maybeSingle();
 
@@ -49,6 +50,7 @@ export default async function AuctionDetailPage({ params }: PageProps) {
     .from("auctions")
     .select("id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at, created_at, updated_at")
     .eq("id", id)
+    .is("archived_at", null)
     .maybeSingle();
 
   if (auctionError || !auctionData) {
