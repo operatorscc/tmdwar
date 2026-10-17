@@ -22,67 +22,30 @@ export async function GET(
 
   const requestUrl = new URL(_request.url);
   if (requestUrl.searchParams.get('archivePreview') === '1') {
-    const { data: auction, error: previewError } = await supabase
-      .from('auctions')
-      .select('id, title, status, archived_at')
-      .eq('id', id)
-      .maybeSingle();
-    if (previewError?.code === '42703' && /archived_at/.test(previewError.message)) {
+    const { data: preview, error: previewError } = await supabase.rpc('archive_auction_preview', {
+      p_auction_id: id,
+    });
+
+    if (previewError) {
+      const status = ['P0001', '42501'].includes(previewError.code ?? '') ? 403
+        : previewError.code === '42883' ? 503
+        : previewError.message?.includes('Lelang sudah diarsipkan') ? 409
+        : previewError.message?.includes('Lelang tidak ditemukan') ? 404
+        : 500;
       return NextResponse.json({
-        error: 'Fitur arsip belum aktif karena migration arsip belum diterapkan pada database yang dipakai preview. Daftar lelang tetap tersedia, tetapi pengarsipan dinonaktifkan sampai skema database diperbarui.'
-      }, { status: 503 });
+        error: previewError.code === '42883'
+          ? 'Pratinjau arsip belum aktif karena migration RPC pratinjau belum diterapkan pada database. Tidak ada perubahan data yang dilakukan.'
+          : previewError.message || 'Gagal memeriksa dampak arsip.',
+      }, { status });
     }
-    if (previewError) return NextResponse.json({ error: previewError.message }, { status: 500 });
-    if (!auction) return NextResponse.json({ error: 'Auction not found' }, { status: 404 });
-    if (auction.archived_at) return NextResponse.json({ error: 'Lelang sudah diarsipkan.' }, { status: 409 });
 
-    const countFor = async (table: string, column = 'auction_id') => {
-      const { count, error } = await supabase.from(table).select('*', { count: 'exact', head: true }).eq(column, id);
-      if (error) throw new Error(`Gagal menghitung ${table}: ${error.message}`);
-      return count ?? 0;
-    };
-    try {
-      const [bids, results, transactionRows, directInventoryRows, directJournalRows] = await Promise.all([
-        countFor('bids'),
-        countFor('auction_results'),
-        supabase.from('finance_transactions').select('id').eq('auction_id', id),
-        supabase.from('finance_inventory_costs').select('id').eq('auction_id', id),
-        supabase.from('finance_journal_lines').select('id').eq('auction_id', id),
-      ]);
-      if (transactionRows.error) throw new Error(`Gagal menghitung transaksi keuangan: ${transactionRows.error.message}`);
-      if (directInventoryRows.error) throw new Error(`Gagal menghitung biaya inventaris: ${directInventoryRows.error.message}`);
-      if (directJournalRows.error) throw new Error(`Gagal menghitung baris jurnal: ${directJournalRows.error.message}`);
-
-      const transactionIds = (transactionRows.data ?? []).map((row) => row.id);
-      let parentJournalRows: { id: number }[] = [];
-      let parentInventoryRows: { id: string }[] = [];
-      if (transactionIds.length > 0) {
-        const [journalResult, inventoryResult] = await Promise.all([
-          supabase.from('finance_journal_lines').select('id').in('transaction_id', transactionIds),
-          supabase.from('finance_inventory_costs').select('id').in('transaction_id', transactionIds),
-        ]);
-        if (journalResult.error) throw new Error(`Gagal menghitung baris jurnal melalui transaksi: ${journalResult.error.message}`);
-        if (inventoryResult.error) throw new Error(`Gagal menghitung biaya inventaris melalui transaksi: ${inventoryResult.error.message}`);
-        parentJournalRows = journalResult.data ?? [];
-        parentInventoryRows = inventoryResult.data ?? [];
-      }
-
-      // Count each record once, even if both its direct and parent links match.
-      const journalLineIds = new Set([
-        ...(directJournalRows.data ?? []).map((row) => row.id),
-        ...parentJournalRows.map((row) => row.id),
-      ]);
-      const inventoryCostIds = new Set([
-        ...(directInventoryRows.data ?? []).map((row) => row.id),
-        ...parentInventoryRows.map((row) => row.id),
-      ]);
-      const transactions = transactionIds.length;
-      const journalLines = journalLineIds.size;
-      const inventoryCosts = inventoryCostIds.size;
-      return NextResponse.json({ title: auction.title, status: auction.status, counts: { bids, results, transactions, journalLines, inventoryCosts } });
-    } catch (error) {
-      return NextResponse.json({ error: error instanceof Error ? error.message : 'Gagal memeriksa dampak arsip.' }, { status: 500 });
+    if (!preview || typeof preview !== 'object' || !preview.counts) {
+      return NextResponse.json({ error: 'Respons pratinjau arsip tidak valid.' }, { status: 500 });
     }
+
+    return NextResponse.json(preview, {
+      headers: { 'Cache-Control': 'no-store, max-age=0' },
+    });
   }
 
   let { data, error } = await supabase
