@@ -17,6 +17,7 @@ export default async function HomePage() {
       .from("auctions")
       .select("id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at")
       .in("status", ["scheduled", "live", "ended"])
+      .is("archived_at", null)
       .order("created_at", { ascending: false });
 
     if (error) {
