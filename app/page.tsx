@@ -13,17 +13,29 @@ export default async function HomePage() {
   let loadError: string | null = null;
 
   try {
-    const { data, error } = await supabase
+    let result = await supabase
       .from("auctions")
       .select("id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at")
       .in("status", ["scheduled", "live", "ended"])
       .is("archived_at", null)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      loadError = error.message;
+    // Preview deployments can point at a database where the archive migration has
+    // not been applied yet. Retry without the archive filter only when Postgres
+    // explicitly reports that the column is missing; no archived rows can exist
+    // in that schema because the archive columns do not exist there.
+    if (result.error?.code === "42703" && /archived_at/.test(result.error.message)) {
+      result = await supabase
+        .from("auctions")
+        .select("id, title, description, image_url, auction_mode, status, starting_price, current_price, min_increment, starts_at, ends_at")
+        .in("status", ["scheduled", "live", "ended"])
+        .order("created_at", { ascending: false });
+    }
+
+    if (result.error) {
+      loadError = result.error.message;
     } else {
-      auctions = (data ?? []) as unknown as Auction[];
+      auctions = (result.data ?? []) as unknown as Auction[];
     }
   } catch (err) {
     loadError = err instanceof Error ? err.message : "Gagal memuat data lelang.";
