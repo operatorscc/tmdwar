@@ -69,8 +69,14 @@ export async function GET(request: Request) {
   const { data, error, count } = await query;
 
   if (error) {
-    // Do not silently return an incomplete list when archive columns are missing.
-    return NextResponse.json({ error: 'Gagal memuat lelang. Pastikan migration arsip sudah diterapkan.' }, { status: 500 });
+    // Give actionable guidance only when the archive schema is actually missing.
+    if (error.code === '42703' && /archived_at|archive_reason/.test(error.message)) {
+      return NextResponse.json(
+        { error: 'Skema arsip belum tersedia. Terapkan migration arsip sebelum menggunakan endpoint ini.' },
+        { status: 500 },
+      );
+    }
+    return NextResponse.json({ error: 'Gagal memuat data lelang.' }, { status: 500 });
   }
 
   return NextResponse.json({
