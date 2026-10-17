@@ -164,6 +164,10 @@ export default function AdminAuctionForm({ mode, initialData, auctionId }: Admin
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </select>
+            <p className="form-hint" style={{ marginTop: 6, fontSize: 12, color: "var(--text-muted)" }}>
+              Pilih Draft untuk menyembunyikan lot dari katalog publik. Lelang Selesai tidak dapat dibuka kembali.
+              Lelang Dibatalkan hanya dapat dijadikan Draft jika belum memiliki penawaran, hasil resmi, atau catatan keuangan.
+            </p>
           </div>
         </div>
 
