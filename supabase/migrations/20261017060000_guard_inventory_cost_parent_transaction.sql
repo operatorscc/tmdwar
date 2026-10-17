@@ -117,7 +117,7 @@ begin
 
   select jsonb_build_object(
     'bids', (select count(*) from public.bids where auction_id = p_auction_id),
-    'results', (select count(*) from public.auction_results where auction_id = p_auction_id),
+    'results', (select case when winner_bidder_id is not null then 1 else 0 end from public.auctions where id = p_auction_id),
     'transactions', (select count(*) from public.finance_transactions where auction_id = p_auction_id),
     'journalLines', (
       select count(*)
