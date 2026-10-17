@@ -101,6 +101,8 @@ begin
   where id = p_auction_id
     and archived_at is null;
 
+  perform pg_catalog.set_config('tmdwar.archive_rpc', 'off', true);
+
   return jsonb_build_object('status', v_next_status, 'counts', v_counts);
 end;
 $archive_function$;
@@ -120,6 +122,10 @@ security definer
 set search_path to ''
 as $archive_transition$
 begin
+  if tg_op = 'DELETE' then
+    raise exception 'Penghapusan permanen lelang dinonaktifkan. Gunakan pengarsipan admin.';
+  end if;
+
   if tg_op = 'INSERT' then
     if new.archived_at is not null
        or new.archived_by is not null
@@ -131,6 +137,10 @@ begin
 
   if old.archived_at is not null then
     raise exception 'Lelang yang sudah diarsipkan bersifat permanen dan tidak dapat diubah atau dipulihkan.';
+  end if;
+
+  if new.archived_at is null and (new.archived_by is not null or new.archive_reason is not null) then
+    raise exception 'Metadata arsip tidak boleh diubah di luar prosedur arsip admin.';
   end if;
 
   if new.archived_at is not null then
@@ -150,8 +160,10 @@ $archive_transition$;
 revoke all on function public.guard_auction_archive_transition() from public, anon, authenticated;
 
 drop trigger if exists guard_auction_archive_transition on public.auctions;
+revoke delete on table public.auctions from anon, authenticated, service_role;
+
 create trigger guard_auction_archive_transition
-  before insert or update on public.auctions
+  before insert or update or delete on public.auctions
   for each row execute function public.guard_auction_archive_transition();
 
 
