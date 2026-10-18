@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type FinanceKind = "inventory_purchase" | "sale" | "customer_receipt" | "operating_expense";
 
@@ -48,7 +48,10 @@ interface FinanceJournalLine {
 interface FinanceData {
   summary: FinanceSummary;
   transactions: FinanceTransaction[];
+  transactionPagination: { page: number; pageSize: number; total: number; totalPages: number };
   journalLines: FinanceJournalLine[];
+  journalTransactions: { id: string; transaction_date: string; reference: string | null }[];
+  journalPagination: { page: number; pageSize: number; total: number; totalPages: number };
   auctions: FinanceAuction[];
   inventoryCosts: { auction_id: string; purchase_cost: number | string }[];
   sales: { auction_id: string | null; amount: number | string }[];
@@ -93,33 +96,56 @@ export default function FinanceClient() {
   const [historyKind, setHistoryKind] = useState<"all" | FinanceKind>("all");
   const [historyFrom, setHistoryFrom] = useState("");
   const [historyTo, setHistoryTo] = useState("");
+  const [transactionPage, setTransactionPage] = useState(1);
+  const [journalPage, setJournalPage] = useState(1);
+  const requestSequence = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestSequence.current;
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/admin/finance", { cache: "no-store" });
+      const params = new URLSearchParams({
+        page: String(transactionPage),
+        journalPage: String(journalPage),
+        search: historySearch.trim(),
+        kind: historyKind,
+        from: historyFrom,
+        to: historyTo,
+      });
+      const response = await fetch(`/api/admin/finance?${params.toString()}`, { cache: "no-store" });
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.error || "Gagal memuat data keuangan.");
       }
+      if (requestId !== requestSequence.current) return;
       setData(result as FinanceData);
     } catch (caught) {
+      if (requestId !== requestSequence.current) return;
       setError(caught instanceof Error ? caught.message : "Terjadi kesalahan saat memuat keuangan.");
     } finally {
-      setLoading(false);
+      if (requestId === requestSequence.current) setLoading(false);
     }
-  }, []);
+  }, [transactionPage, journalPage, historySearch, historyKind, historyFrom, historyTo]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    setTransactionPage(1);
+  }, [historySearch, historyKind, historyFrom, historyTo]);
 
   const auctionMap = useMemo(() => {
     const map = new Map<string, FinanceAuction>();
     for (const auction of data?.auctions ?? []) map.set(auction.id, auction);
     return map;
   }, [data?.auctions]);
+
+  const journalTransactionMap = useMemo(
+    () => new Map((data?.journalTransactions ?? []).map((transaction) => [transaction.id, transaction])),
+    [data?.journalTransactions],
+  );
 
   const purchasedIds = useMemo(
     () => new Set((data?.inventoryCosts ?? []).map((item) => item.auction_id)),
@@ -153,18 +179,7 @@ export default function FinanceClient() {
     return remaining;
   }, [saleByAuction, paidByAuction]);
   const selectedRemaining = remainingByAuction.get(auctionId) ?? 0;
-  const visibleTransactions = useMemo(() => {
-    const query = historySearch.trim().toLocaleLowerCase("id-ID");
-    return (data?.transactions ?? []).filter((transaction) => {
-      if (historyKind !== "all" && transaction.kind !== historyKind) return false;
-      if (historyFrom && transaction.transaction_date < historyFrom) return false;
-      if (historyTo && transaction.transaction_date > historyTo) return false;
-      if (!query) return true;
-      const auctionTitle = transaction.auction_id ? auctionMap.get(transaction.auction_id)?.title ?? "" : "operasional";
-      return [transaction.description, transaction.counterparty, transaction.reference, auctionTitle, KIND_LABELS[transaction.kind]]
-        .some((value) => String(value ?? "").toLocaleLowerCase("id-ID").includes(query));
-    });
-  }, [data?.transactions, historySearch, historyKind, historyFrom, historyTo, auctionMap]);
+  const visibleTransactions = data?.transactions ?? [];
 
   const eligibleAuctions = useMemo(() => {
     const auctions = data?.auctions ?? [];
@@ -258,6 +273,9 @@ export default function FinanceClient() {
                   </div>
                 </div>
               ))}
+              <p style={{ gridColumn: "1 / -1", color: "var(--text-secondary)", fontSize: 12, margin: "0 2px" }}>
+                Ringkasan dihitung dari seluruh jurnal yang tercatat, bukan hanya hasil pencarian atau filter tanggal di riwayat transaksi. Laba/rugi ini bersifat sementara dan belum tentu mencakup pajak atau penyesuaian akuntansi di luar pencatatan saat ini.
+              </p>
             </div>
           )}
 
@@ -365,7 +383,7 @@ export default function FinanceClient() {
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
               <div>
                 <h2 style={{ fontSize: 20, fontWeight: 850 }}>Riwayat transaksi</h2>
-                <p style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 4 }}>Cari dan saring hingga 100 transaksi terbaru yang dimuat dari server.</p>
+                <p style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 4 }}>Menampilkan {data?.transactionPagination.total ?? 0} hasil yang cocok, halaman {data?.transactionPagination.page ?? 1} dari {data?.transactionPagination.totalPages ?? 1}. Pencarian dan filter diterapkan ke seluruh histori.</p>
               </div>
               <Link href="/admin/dashboard" className="btn-secondary" style={{ padding: "9px 14px", alignSelf: "start" }}>Kembali ke dashboard</Link>
             </div>
@@ -378,7 +396,7 @@ export default function FinanceClient() {
               <label className="form-field"><span className="form-label">Dari tanggal</span><input className="form-input" type="date" value={historyFrom} max={historyTo || undefined} onChange={(event) => setHistoryFrom(event.target.value)} /></label>
               <label className="form-field"><span className="form-label">Sampai tanggal</span><input className="form-input" type="date" value={historyTo} min={historyFrom || undefined} onChange={(event) => setHistoryTo(event.target.value)} /></label>
             </div>
-            {!data?.transactions.length ? (
+            {!data?.transactionPagination.total ? (
               <div className="empty-box">Belum ada transaksi keuangan yang dicatat.</div>
             ) : visibleTransactions.length === 0 ? (
               <div className="empty-box">Tidak ada transaksi yang cocok dengan filter.</div>
@@ -413,6 +431,13 @@ export default function FinanceClient() {
                 </table>
               </div>
             )}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
+              <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>Halaman {data?.transactionPagination.page ?? 1} / {data?.transactionPagination.totalPages ?? 1}</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn-secondary" type="button" disabled={(data?.transactionPagination.page ?? 1) <= 1 || loading} onClick={() => setTransactionPage((page) => Math.max(1, page - 1))}>Sebelumnya</button>
+                <button className="btn-secondary" type="button" disabled={(data?.transactionPagination.page ?? 1) >= (data?.transactionPagination.totalPages ?? 1) || loading} onClick={() => setTransactionPage((page) => page + 1)}>Berikutnya</button>
+              </div>
+            </div>
           </section>
 
           <section className="admin-finance-section admin-finance-journal" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: 22, marginTop: 24 }}>
@@ -420,8 +445,10 @@ export default function FinanceClient() {
             <p style={{ color: "var(--text-secondary)", fontSize: 12, marginBottom: 16 }}>
               Rincian debit-kredit dari transaksi keuangan terbaru. Setiap transaksi yang diposting harus seimbang.
             </p>
-            {!data?.journalLines.length ? (
+            {!data?.journalPagination.total ? (
               <div className="empty-box">Belum ada baris jurnal.</div>
+            ) : data.journalLines.length === 0 ? (
+              <div className="empty-box">Tidak ada baris jurnal pada halaman ini.</div>
             ) : (
               <div style={{ overflowX: "auto" }}>
                 <table className="data-table">
@@ -437,7 +464,7 @@ export default function FinanceClient() {
                   </thead>
                   <tbody>
                     {data.journalLines.map((line) => {
-                      const transaction = data.transactions.find((item) => item.id === line.transaction_id);
+                      const transaction = journalTransactionMap.get(line.transaction_id);
                       return (
                         <tr key={line.id}>
                           <td style={{ whiteSpace: "nowrap" }}>{transaction?.transaction_date || "—"}</td>
@@ -453,6 +480,13 @@ export default function FinanceClient() {
                 </table>
               </div>
             )}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
+              <span style={{ color: "var(--text-secondary)", fontSize: 12 }}>Halaman {data?.journalPagination.page ?? 1} / {data?.journalPagination.totalPages ?? 1} ({data?.journalPagination.total ?? 0} baris jurnal)</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn-secondary" type="button" disabled={(data?.journalPagination.page ?? 1) <= 1 || loading} onClick={() => setJournalPage((page) => Math.max(1, page - 1))}>Sebelumnya</button>
+                <button className="btn-secondary" type="button" disabled={(data?.journalPagination.page ?? 1) >= (data?.journalPagination.totalPages ?? 1) || loading} onClick={() => setJournalPage((page) => page + 1)}>Berikutnya</button>
+              </div>
+            </div>
           </section>
         </>
       )}

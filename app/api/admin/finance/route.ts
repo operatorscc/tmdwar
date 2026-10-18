@@ -9,7 +9,25 @@ const KINDS = new Set([
   "operating_expense",
 ]);
 
-export async function GET() {
+const DATA_PAGE_SIZE = 500;
+
+async function fetchAllRows<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<{
+    data: T[] | null;
+    error: { message: string } | null;
+  }>,
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += DATA_PAGE_SIZE) {
+    const { data, error } = await fetchPage(from, from + DATA_PAGE_SIZE - 1);
+    if (error) return { data: [], error };
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < DATA_PAGE_SIZE) return { data: rows, error: null };
+  }
+}
+
+export async function GET(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -25,24 +43,91 @@ export async function GET() {
     return NextResponse.json({ error: adminError || "Akses ditolak." }, { status: 403 });
   }
 
+  const url = new URL(request.url);
+  const transactionPage = Math.max(1, Math.min(100000, Number.parseInt(url.searchParams.get("page") || "1", 10) || 1));
+  const journalPage = Math.max(1, Math.min(100000, Number.parseInt(url.searchParams.get("journalPage") || "1", 10) || 1));
+  const pageSize = 50;
+  const journalPageSize = 100;
+  const search = (url.searchParams.get("search") || "")
+    .trim()
+    .slice(0, 100)
+    .replace(/[,%()_*\\]/g, " ")
+    .trim();
+  const kind = url.searchParams.get("kind") || "all";
+  const dateFrom = url.searchParams.get("from") || "";
+  const dateTo = url.searchParams.get("to") || "";
+
+  if (kind !== "all" && !KINDS.has(kind)) {
+    return NextResponse.json({ error: "Filter jenis transaksi tidak valid." }, { status: 400 });
+  }
+  const validDate = (value: string) =>
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    !Number.isNaN(Date.parse(value)) &&
+    new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
+  if ((dateFrom && !validDate(dateFrom)) || (dateTo && !validDate(dateTo)) || (dateFrom && dateTo && dateFrom > dateTo)) {
+    return NextResponse.json({ error: "Rentang tanggal filter tidak valid." }, { status: 400 });
+  }
+
+  let matchingAuctionIds: string[] = [];
+  if (search) {
+    const matchingAuctionsResult = await fetchAllRows<{ id: string }>((from, to) =>
+      supabase.from("auctions").select("id").ilike("title", `%${search}%`).order("id", { ascending: true }).range(from, to),
+    );
+    if (matchingAuctionsResult.error) {
+      return NextResponse.json({ error: "Gagal mencari lot: " + matchingAuctionsResult.error.message }, { status: 500 });
+    }
+    matchingAuctionIds = matchingAuctionsResult.data.map((auction) => auction.id);
+  }
+
+  let transactionsQuery = supabase
+    .from("finance_transactions")
+    .select("id, transaction_date, kind, amount, auction_id, description, counterparty, reference, created_at", { count: "exact" });
+  if (kind !== "all") transactionsQuery = transactionsQuery.eq("kind", kind);
+  if (dateFrom) transactionsQuery = transactionsQuery.gte("transaction_date", dateFrom);
+  if (dateTo) transactionsQuery = transactionsQuery.lte("transaction_date", dateTo);
+  if (search) {
+    const searchClauses = [
+      `description.ilike.%${search}%`,
+      `counterparty.ilike.%${search}%`,
+      `reference.ilike.%${search}%`,
+    ];
+    const kindSearchLabels: Record<string, string> = {
+      inventory_purchase: "Pembelian barang",
+      sale: "Penjualan barang",
+      customer_receipt: "Penerimaan pembayaran",
+      operating_expense: "Beban operasional",
+    };
+    const normalizedSearch = search.toLocaleLowerCase("id-ID");
+    for (const [transactionKind, label] of Object.entries(kindSearchLabels)) {
+      if (label.toLocaleLowerCase("id-ID").includes(normalizedSearch)) {
+        searchClauses.push(`kind.eq.${transactionKind}`);
+      }
+    }
+    if (matchingAuctionIds.length > 0) {
+      searchClauses.push(`auction_id.in.(${matchingAuctionIds.join(",")})`);
+    }
+    transactionsQuery = transactionsQuery.or(searchClauses.join(","));
+  }
+
   const [summaryResult, transactionsResult, auctionsResult, journalResult] = await Promise.all([
     supabase.rpc("finance_dashboard_summary"),
-    supabase
-      .from("finance_transactions")
-      .select("id, transaction_date, kind, amount, auction_id, description, counterparty, reference, created_at")
+    transactionsQuery
       .order("transaction_date", { ascending: false })
       .order("created_at", { ascending: false })
-      .limit(100),
-    supabase
-      .from("auctions")
-      .select("id, title, status, current_price, starting_price")
-      .order("created_at", { ascending: false })
-      .limit(500),
+      .range((transactionPage - 1) * pageSize, transactionPage * pageSize - 1),
+    fetchAllRows((from, to) =>
+      supabase
+        .from("auctions")
+        .select("id, title, status, current_price, starting_price")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
     supabase
       .from("finance_journal_lines")
-      .select("id, transaction_id, auction_id, debit, credit, account:finance_accounts(code, name)")
+      .select("id, transaction_id, auction_id, debit, credit, account:finance_accounts(code, name)", { count: "exact" })
       .order("id", { ascending: false })
-      .limit(300),
+      .range((journalPage - 1) * journalPageSize, journalPage * journalPageSize - 1),
   ]);
 
   if (summaryResult.error) {
@@ -61,16 +146,37 @@ export async function GET() {
     return NextResponse.json({ error: "Gagal memuat jurnal: " + journalResult.error.message }, { status: 500 });
   }
 
-  const { data: inventoryCosts, error: costsError } = await supabase
-    .from("finance_inventory_costs")
-    .select("auction_id, purchase_cost");
-  if (costsError) {
-    return NextResponse.json({ error: "Gagal memuat harga perolehan: " + costsError.message }, { status: 500 });
+  const journalTransactionIds = [...new Set((journalResult.data ?? []).map((line) => line.transaction_id))];
+  let journalTransactions: { id: string; transaction_date: string; reference: string | null }[] = [];
+  if (journalTransactionIds.length > 0) {
+    const { data, error } = await supabase
+      .from("finance_transactions")
+      .select("id, transaction_date, reference")
+      .in("id", journalTransactionIds);
+    if (error) {
+      return NextResponse.json({ error: "Gagal memuat referensi jurnal: " + error.message }, { status: 500 });
+    }
+    journalTransactions = data ?? [];
+  }
+
+  const inventoryCostsResult = await fetchAllRows<{ auction_id: string; purchase_cost: number }>((from, to) =>
+    supabase
+      .from("finance_inventory_costs")
+      .select("auction_id, purchase_cost")
+      .order("auction_id", { ascending: true })
+      .range(from, to),
+  );
+  if (inventoryCostsResult.error) {
+    return NextResponse.json({ error: "Gagal memuat harga perolehan: " + inventoryCostsResult.error.message }, { status: 500 });
   }
 
   const [salesResult, receiptsResult] = await Promise.all([
-    supabase.from("finance_transactions").select("auction_id, amount").eq("kind", "sale"),
-    supabase.from("finance_transactions").select("auction_id, amount").eq("kind", "customer_receipt"),
+    fetchAllRows<{ auction_id: string | null; amount: number }>((from, to) =>
+      supabase.from("finance_transactions").select("auction_id, amount").eq("kind", "sale").order("id", { ascending: true }).range(from, to),
+    ),
+    fetchAllRows<{ auction_id: string | null; amount: number }>((from, to) =>
+      supabase.from("finance_transactions").select("auction_id, amount").eq("kind", "customer_receipt").order("id", { ascending: true }).range(from, to),
+    ),
   ]);
   if (salesResult.error) {
     return NextResponse.json({ error: "Gagal memuat penjualan: " + salesResult.error.message }, { status: 500 });
@@ -82,11 +188,24 @@ export async function GET() {
   return NextResponse.json({
     summary: summaryResult.data,
     transactions: transactionsResult.data ?? [],
+    transactionPagination: {
+      page: transactionPage,
+      pageSize,
+      total: transactionsResult.count ?? 0,
+      totalPages: Math.max(1, Math.ceil((transactionsResult.count ?? 0) / pageSize)),
+    },
     journalLines: journalResult.data ?? [],
+    journalTransactions,
+    journalPagination: {
+      page: journalPage,
+      pageSize: journalPageSize,
+      total: journalResult.count ?? 0,
+      totalPages: Math.max(1, Math.ceil((journalResult.count ?? 0) / journalPageSize)),
+    },
     auctions: auctionsResult.data ?? [],
-    inventoryCosts: inventoryCosts ?? [],
-    sales: salesResult.data ?? [],
-    receipts: receiptsResult.data ?? [],
+    inventoryCosts: inventoryCostsResult.data,
+    sales: salesResult.data,
+    receipts: receiptsResult.data,
   });
 }
 
