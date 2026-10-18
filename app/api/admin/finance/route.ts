@@ -9,6 +9,24 @@ const KINDS = new Set([
   "operating_expense",
 ]);
 
+const DATA_PAGE_SIZE = 500;
+
+async function fetchAllRows<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<{
+    data: T[] | null;
+    error: { message: string } | null;
+  }>,
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += DATA_PAGE_SIZE) {
+    const { data, error } = await fetchPage(from, from + DATA_PAGE_SIZE - 1);
+    if (error) return { data: [], error };
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < DATA_PAGE_SIZE) return { data: rows, error: null };
+  }
+}
+
 export async function GET(request: Request) {
   const supabase = await createClient();
   const {
@@ -52,14 +70,13 @@ export async function GET(request: Request) {
 
   let matchingAuctionIds: string[] = [];
   if (search) {
-    const { data: matchingAuctions, error: matchingAuctionsError } = await supabase
-      .from("auctions")
-      .select("id")
-      .ilike("title", `%${search}%`);
-    if (matchingAuctionsError) {
-      return NextResponse.json({ error: "Gagal mencari lot: " + matchingAuctionsError.message }, { status: 500 });
+    const matchingAuctionsResult = await fetchAllRows<{ id: string }>((from, to) =>
+      supabase.from("auctions").select("id").ilike("title", `%${search}%`).range(from, to),
+    );
+    if (matchingAuctionsResult.error) {
+      return NextResponse.json({ error: "Gagal mencari lot: " + matchingAuctionsResult.error.message }, { status: 500 });
     }
-    matchingAuctionIds = (matchingAuctions ?? []).map((auction) => auction.id);
+    matchingAuctionIds = matchingAuctionsResult.data.map((auction) => auction.id);
   }
 
   let transactionsQuery = supabase
@@ -86,11 +103,13 @@ export async function GET(request: Request) {
       .order("transaction_date", { ascending: false })
       .order("created_at", { ascending: false })
       .range((transactionPage - 1) * pageSize, transactionPage * pageSize - 1),
-    supabase
-      .from("auctions")
-      .select("id, title, status, current_price, starting_price")
-      .order("created_at", { ascending: false })
-      .limit(500),
+    fetchAllRows((from, to) =>
+      supabase
+        .from("auctions")
+        .select("id, title, status, current_price, starting_price")
+        .order("created_at", { ascending: false })
+        .range(from, to),
+    ),
     supabase
       .from("finance_journal_lines")
       .select("id, transaction_id, auction_id, debit, credit, account:finance_accounts(code, name)", { count: "exact" })
@@ -127,16 +146,24 @@ export async function GET(request: Request) {
     journalTransactions = data ?? [];
   }
 
-  const { data: inventoryCosts, error: costsError } = await supabase
-    .from("finance_inventory_costs")
-    .select("auction_id, purchase_cost");
-  if (costsError) {
-    return NextResponse.json({ error: "Gagal memuat harga perolehan: " + costsError.message }, { status: 500 });
+  const inventoryCostsResult = await fetchAllRows<{ auction_id: string; purchase_cost: number }>((from, to) =>
+    supabase
+      .from("finance_inventory_costs")
+      .select("auction_id, purchase_cost")
+      .order("auction_id", { ascending: true })
+      .range(from, to),
+  );
+  if (inventoryCostsResult.error) {
+    return NextResponse.json({ error: "Gagal memuat harga perolehan: " + inventoryCostsResult.error.message }, { status: 500 });
   }
 
   const [salesResult, receiptsResult] = await Promise.all([
-    supabase.from("finance_transactions").select("auction_id, amount").eq("kind", "sale"),
-    supabase.from("finance_transactions").select("auction_id, amount").eq("kind", "customer_receipt"),
+    fetchAllRows<{ auction_id: string | null; amount: number }>((from, to) =>
+      supabase.from("finance_transactions").select("auction_id, amount").eq("kind", "sale").order("id", { ascending: true }).range(from, to),
+    ),
+    fetchAllRows<{ auction_id: string | null; amount: number }>((from, to) =>
+      supabase.from("finance_transactions").select("auction_id, amount").eq("kind", "customer_receipt").order("id", { ascending: true }).range(from, to),
+    ),
   ]);
   if (salesResult.error) {
     return NextResponse.json({ error: "Gagal memuat penjualan: " + salesResult.error.message }, { status: 500 });
@@ -163,9 +190,9 @@ export async function GET(request: Request) {
       totalPages: Math.max(1, Math.ceil((journalResult.count ?? 0) / journalPageSize)),
     },
     auctions: auctionsResult.data ?? [],
-    inventoryCosts: inventoryCosts ?? [],
-    sales: salesResult.data ?? [],
-    receipts: receiptsResult.data ?? [],
+    inventoryCosts: inventoryCostsResult.data,
+    sales: salesResult.data,
+    receipts: receiptsResult.data,
   });
 }
 
