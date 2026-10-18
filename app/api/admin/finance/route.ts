@@ -43,7 +43,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Filter jenis transaksi tidak valid." }, { status: 400 });
   }
   const validDate = (value: string) =>
-    /^\\d{4}-\\d{2}-\\d{2}$/.test(value) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
     !Number.isNaN(Date.parse(value)) &&
     new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
   if ((dateFrom && !validDate(dateFrom)) || (dateTo && !validDate(dateTo)) || (dateFrom && dateTo && dateFrom > dateTo)) {
