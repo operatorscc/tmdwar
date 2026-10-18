@@ -3,7 +3,6 @@
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { getSafeRedirect } from "@/lib/auction";
 
 type OAuthProvider = "facebook" | "google";
@@ -18,47 +17,14 @@ function LoginForm() {
   const errorParam = searchParams.get("error");
   const safeNext = getSafeRedirect(nextParam, "/");
 
-  async function handleOAuthLogin(provider: OAuthProvider) {
+  function handleOAuthLogin(provider: OAuthProvider) {
     setError(null);
     setLoadingProvider(provider);
 
-    try {
-      const supabase = createClient();
-
-      // Gunakan origin browser saat ini agar cookie PKCE dan callback
-      // tetap berada pada domain yang sama (penting untuk alias Vercel).
-      const configuredSiteUrl = window.location.origin.trim();
-      const parsedSiteUrl = new URL(configuredSiteUrl);
-
-      if (
-        parsedSiteUrl.protocol !== "https:" &&
-        parsedSiteUrl.hostname !== "localhost"
-      ) {
-        throw new Error("URL aplikasi harus menggunakan HTTPS.");
-      }
-
-      const siteOrigin = parsedSiteUrl.origin;
-      const redirectTo = new URL("/auth/callback", siteOrigin);
-      redirectTo.searchParams.set("next", safeNext);
-
-      const { error: authError } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: redirectTo.toString(),
-          ...(provider === "facebook" ? { scopes: "email" } : {}),
-        },
-      });
-
-      if (authError) {
-        setError(authError.message);
-        setLoadingProvider(null);
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Gagal memulai sesi login."
-      );
-      setLoadingProvider(null);
-    }
+    const loginUrl = new URL("/auth/login", window.location.origin);
+    loginUrl.searchParams.set("provider", provider);
+    loginUrl.searchParams.set("next", safeNext);
+    window.location.assign(loginUrl.toString());
   }
 
   const isLoading = loadingProvider !== null;
@@ -139,8 +105,10 @@ function LoginForm() {
         >
           {error ||
             (errorParam === "oauth_callback_failed"
-              ? "Login gagal atau dibatalkan. Silakan periksa konfigurasi provider dan coba kembali."
-              : errorParam)}
+              ? "Login gagal saat verifikasi callback. Silakan coba kembali."
+              : errorParam === "oauth_start_failed"
+                ? "Tidak dapat memulai login. Periksa konfigurasi OAuth dan coba kembali."
+                : errorParam)}
         </div>
       )}
 
