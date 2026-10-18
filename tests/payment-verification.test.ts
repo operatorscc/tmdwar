@@ -25,6 +25,13 @@ describe("Bank transfer payment verification contract", () => {
     assert.match(migration, /one_pending_per_auction_bidder/);
   });
 
+  it("allows payment of an already-recorded sale after the auction is archived", () => {
+    const submitFunction = migration.split("create or replace function public.submit_payment_proof(")[1]
+      ?.split("$submit_payment$;")[0] ?? "";
+    assert.match(submitFunction, /from public\\.finance_transactions t[\\s\\S]*t\\.kind = 'sale'/);
+    assert.doesNotMatch(submitFunction, /archived_at/);
+  });
+
   it("does not post cash or receivable journals before admin approval", () => {
     assert.match(migration, /status = 'pending'/);
     assert.match(migration, /public\.finance_record_transaction\([\s\S]*'customer_receipt'/);
