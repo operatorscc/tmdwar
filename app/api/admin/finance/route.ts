@@ -30,12 +30,59 @@ export async function GET(request: Request) {
   const journalPage = Math.max(1, Math.min(100000, Number.parseInt(url.searchParams.get("journalPage") || "1", 10) || 1));
   const pageSize = 50;
   const journalPageSize = 100;
+  const search = (url.searchParams.get("search") || "")
+    .trim()
+    .slice(0, 100)
+    .replace(/[,%()_*\\]/g, " ")
+    .trim();
+  const kind = url.searchParams.get("kind") || "all";
+  const dateFrom = url.searchParams.get("from") || "";
+  const dateTo = url.searchParams.get("to") || "";
+
+  if (kind !== "all" && !KINDS.has(kind)) {
+    return NextResponse.json({ error: "Filter jenis transaksi tidak valid." }, { status: 400 });
+  }
+  const validDate = (value: string) =>
+    /^\\d{4}-\\d{2}-\\d{2}$/.test(value) &&
+    !Number.isNaN(Date.parse(value)) &&
+    new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
+  if ((dateFrom && !validDate(dateFrom)) || (dateTo && !validDate(dateTo)) || (dateFrom && dateTo && dateFrom > dateTo)) {
+    return NextResponse.json({ error: "Rentang tanggal filter tidak valid." }, { status: 400 });
+  }
+
+  let matchingAuctionIds: string[] = [];
+  if (search) {
+    const { data: matchingAuctions, error: matchingAuctionsError } = await supabase
+      .from("auctions")
+      .select("id")
+      .ilike("title", `%${search}%`);
+    if (matchingAuctionsError) {
+      return NextResponse.json({ error: "Gagal mencari lot: " + matchingAuctionsError.message }, { status: 500 });
+    }
+    matchingAuctionIds = (matchingAuctions ?? []).map((auction) => auction.id);
+  }
+
+  let transactionsQuery = supabase
+    .from("finance_transactions")
+    .select("id, transaction_date, kind, amount, auction_id, description, counterparty, reference, created_at", { count: "exact" });
+  if (kind !== "all") transactionsQuery = transactionsQuery.eq("kind", kind);
+  if (dateFrom) transactionsQuery = transactionsQuery.gte("transaction_date", dateFrom);
+  if (dateTo) transactionsQuery = transactionsQuery.lte("transaction_date", dateTo);
+  if (search) {
+    const searchClauses = [
+      `description.ilike.%${search}%`,
+      `counterparty.ilike.%${search}%`,
+      `reference.ilike.%${search}%`,
+    ];
+    if (matchingAuctionIds.length > 0) {
+      searchClauses.push(`auction_id.in.(${matchingAuctionIds.join(",")})`);
+    }
+    transactionsQuery = transactionsQuery.or(searchClauses.join(","));
+  }
 
   const [summaryResult, transactionsResult, auctionsResult, journalResult] = await Promise.all([
     supabase.rpc("finance_dashboard_summary"),
-    supabase
-      .from("finance_transactions")
-      .select("id, transaction_date, kind, amount, auction_id, description, counterparty, reference, created_at", { count: "exact" })
+    transactionsQuery
       .order("transaction_date", { ascending: false })
       .order("created_at", { ascending: false })
       .range((transactionPage - 1) * pageSize, transactionPage * pageSize - 1),
