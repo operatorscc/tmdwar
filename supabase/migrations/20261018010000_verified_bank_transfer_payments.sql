@@ -115,7 +115,18 @@ begin
     raise exception 'Referensi transfer wajib diisi (maksimal 160 karakter).';
   end if;
   if p_proof_path is null
-     or p_proof_path !~ ('^' || v_uid::text || '/' || p_payment_id::text || '/[^/]+ may submit payment for a recorded sale.
+     or p_proof_path !~ ('^' || v_uid::text || '/' || p_payment_id::text || '/[^/]+$') then
+    raise exception 'Lokasi bukti transfer tidak valid.';
+  end if;
+  if not exists (
+    select 1 from storage.objects o
+    where o.bucket_id = 'payment-proofs'
+      and o.name = p_proof_path
+  ) then
+    raise exception 'File bukti transfer belum terunggah ke penyimpanan privat.';
+  end if;
+
+  -- Only the official auction winner may submit payment for a recorded sale.
   if not exists (
     select 1
     from public.auction_results r
