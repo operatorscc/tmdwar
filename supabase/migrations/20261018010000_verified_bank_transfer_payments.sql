@@ -136,12 +136,12 @@ begin
     raise exception 'Hanya pemenang resmi lelang yang dapat mengajukan pembayaran.';
   end if;
 
+  -- Archiving hides an auction from active listings; it must not block
+  -- payment of an already-recorded sale or erase the buyer's receivable.
   select t.amount into v_sale_amount
   from public.finance_transactions t
-  join public.auctions a on a.id = t.auction_id
   where t.auction_id = p_auction_id
     and t.kind = 'sale'
-    and (to_jsonb(a) ->> 'archived_at') is null
   for update of t;
 
   if v_sale_amount is null then
