@@ -115,8 +115,216 @@ begin
     raise exception 'Referensi transfer wajib diisi (maksimal 160 karakter).';
   end if;
   if p_proof_path is null
-     or p_proof_path !~ ('^' || v_uid::text || '/' || p_payment_id::text || '/[^/]+$') then
+     or p_proof_path !~ ('^' || v_uid::text || '/' || p_payment_id::text || '/[^/]+ may submit payment for a recorded sale.
+  if not exists (
+    select 1
+    from public.auction_results r
+    where r.auction_id = p_auction_id
+      and r.winner_bidder_id = v_uid
+  ) then
+    raise exception 'Hanya pemenang resmi lelang yang dapat mengajukan pembayaran.';
+  end if;
+
+  select t.amount into v_sale_amount
+  from public.finance_transactions t
+  join public.auctions a on a.id = t.auction_id
+  where t.auction_id = p_auction_id
+    and t.kind = 'sale'
+    and a.archived_at is null
+  for update of t;
+
+  if v_sale_amount is null then
+    raise exception 'Faktur penjualan belum tersedia. Hubungi admin.';
+  end if;
+
+  select coalesce(sum(t.amount), 0) into v_received
+  from public.finance_transactions t
+  where t.auction_id = p_auction_id and t.kind = 'customer_receipt';
+
+  if p_amount > v_sale_amount - v_received then
+    raise exception 'Nominal melebihi sisa piutang. Sisa saat ini: %', v_sale_amount - v_received;
+  end if;
+
+  if exists (
+    select 1 from public.payment_submissions s
+    where s.auction_id = p_auction_id
+      and s.bidder_id = v_uid
+      and s.status = 'pending'
+  ) then
+    raise exception 'Masih ada pengajuan pembayaran yang menunggu verifikasi untuk lot ini.';
+  end if;
+
+  insert into public.payment_submissions (
+    id, auction_id, bidder_id, amount, transfer_reference, proof_path
+  ) values (
+    p_payment_id, p_auction_id, v_uid, p_amount, btrim(p_transfer_reference), p_proof_path
+  );
+
+  return p_payment_id;
+end;
+$submit_payment$;
+
+create or replace function public.review_payment_submission(
+  p_payment_id uuid,
+  p_decision text,
+  p_rejection_reason text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path to ''
+as $review_payment$
+declare
+  v_uid uuid := auth.uid();
+  v_payment public.payment_submissions%rowtype;
+  v_finance_transaction_id uuid;
+begin
+  if v_uid is null or not public.is_admin() then
+    raise exception 'Hanya admin yang dapat memverifikasi pembayaran.';
+  end if;
+  if p_decision not in ('approved', 'rejected') then
+    raise exception 'Keputusan verifikasi tidak valid.';
+  end if;
+  if p_decision = 'rejected'
+     and (nullif(btrim(p_rejection_reason), '') is null or length(btrim(p_rejection_reason)) > 1000) then
+    raise exception 'Alasan penolakan wajib diisi (maksimal 1.000 karakter).';
+  end if;
+
+  select * into v_payment
+  from public.payment_submissions
+  where id = p_payment_id
+  for update;
+
+  if not found then
+    raise exception 'Pengajuan pembayaran tidak ditemukan.';
+  end if;
+  if v_payment.status <> 'pending' then
+    raise exception 'Pengajuan ini sudah diputuskan dan tidak dapat diproses ulang.';
+  end if;
+
+  if p_decision = 'approved' then
+    -- Reuse the existing authoritative finance RPC so receipt and balanced journal
+    -- are written in the same database transaction as the approval status.
+    v_finance_transaction_id := public.finance_record_transaction(
+      'customer_receipt',
+      v_payment.auction_id,
+      v_payment.amount,
+      (clock_timestamp() at time zone 'Asia/Jakarta')::date,
+      'Verifikasi transfer pembayaran lelang',
+      null,
+      v_payment.transfer_reference
+    );
+
+    update public.payment_submissions
+    set status = 'approved',
+        decided_by = v_uid,
+        decided_at = clock_timestamp(),
+        rejection_reason = null,
+        finance_transaction_id = v_finance_transaction_id,
+        updated_at = clock_timestamp()
+    where id = p_payment_id;
+
+    return jsonb_build_object(
+      'id', p_payment_id,
+      'status', 'approved',
+      'finance_transaction_id', v_finance_transaction_id
+    );
+  end if;
+
+  update public.payment_submissions
+  set status = 'rejected',
+      decided_by = v_uid,
+      decided_at = clock_timestamp(),
+      rejection_reason = btrim(p_rejection_reason),
+      finance_transaction_id = null,
+      updated_at = clock_timestamp()
+  where id = p_payment_id;
+
+  return jsonb_build_object('id', p_payment_id, 'status', 'rejected');
+end;
+$review_payment$;
+
+create or replace function public.payment_context_for_auction(p_auction_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path to ''
+as $payment_context$
+declare
+  v_uid uuid := auth.uid();
+  v_sale_amount bigint;
+  v_received bigint;
+  v_is_winner boolean;
+  v_submissions jsonb;
+begin
+  if v_uid is null then
+    raise exception 'Login diperlukan untuk melihat status pembayaran.';
+  end if;
+
+  select exists (
+    select 1 from public.auction_results r
+    where r.auction_id = p_auction_id and r.winner_bidder_id = v_uid
+  ) into v_is_winner;
+
+  if not v_is_winner then
+    return jsonb_build_object('eligible', false);
+  end if;
+
+  select t.amount into v_sale_amount
+  from public.finance_transactions t
+  where t.auction_id = p_auction_id and t.kind = 'sale'
+  limit 1;
+
+  if v_sale_amount is null then
+    return jsonb_build_object('eligible', true, 'invoice_ready', false);
+  end if;
+
+  select coalesce(sum(t.amount), 0) into v_received
+  from public.finance_transactions t
+  where t.auction_id = p_auction_id and t.kind = 'customer_receipt';
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', s.id,
+    'amount', s.amount,
+    'transfer_reference', s.transfer_reference,
+    'status', s.status,
+    'submitted_at', s.submitted_at,
+    'decided_at', s.decided_at,
+    'rejection_reason', s.rejection_reason
+  ) order by s.submitted_at desc), '[]'::jsonb)
+  into v_submissions
+  from public.payment_submissions s
+  where s.auction_id = p_auction_id and s.bidder_id = v_uid;
+
+  return jsonb_build_object(
+    'eligible', true,
+    'invoice_ready', true,
+    'sale_amount', v_sale_amount,
+    'received_amount', v_received,
+    'outstanding_amount', greatest(v_sale_amount - v_received, 0),
+    'submissions', v_submissions
+  );
+end;
+$payment_context$;
+
+revoke all on function public.payment_context_for_auction(uuid) from public, anon;
+grant execute on function public.payment_context_for_auction(uuid) to authenticated;
+
+revoke all on function public.submit_payment_proof(uuid, uuid, bigint, text, text) from public, anon;
+grant execute on function public.submit_payment_proof(uuid, uuid, bigint, text, text) to authenticated;
+revoke all on function public.review_payment_submission(uuid, text, text) from public, anon;
+grant execute on function public.review_payment_submission(uuid, text, text) to authenticated;
+
+commit;
+) then
     raise exception 'Lokasi bukti transfer tidak valid.';
+  end if;
+  if not exists (
+    select 1 from storage.objects o
+    where o.bucket_id = 'payment-proofs'
+      and o.name = p_proof_path
+  ) then
+    raise exception 'File bukti transfer belum terunggah ke penyimpanan privat.';
   end if;
 
   -- Only the official auction winner may submit payment for a recorded sale.
