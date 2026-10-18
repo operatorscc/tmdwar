@@ -130,7 +130,7 @@ begin
   join public.auctions a on a.id = t.auction_id
   where t.auction_id = p_auction_id
     and t.kind = 'sale'
-    and a.archived_at is null
+    and (to_jsonb(a) ->> 'archived_at') is null
   for update of t;
 
   if v_sale_amount is null then
