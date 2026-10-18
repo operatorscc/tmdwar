@@ -71,7 +71,7 @@ export async function GET(request: Request) {
   let matchingAuctionIds: string[] = [];
   if (search) {
     const matchingAuctionsResult = await fetchAllRows<{ id: string }>((from, to) =>
-      supabase.from("auctions").select("id").ilike("title", `%${search}%`).range(from, to),
+      supabase.from("auctions").select("id").ilike("title", `%${search}%`).order("id", { ascending: true }).range(from, to),
     );
     if (matchingAuctionsResult.error) {
       return NextResponse.json({ error: "Gagal mencari lot: " + matchingAuctionsResult.error.message }, { status: 500 });
@@ -120,6 +120,7 @@ export async function GET(request: Request) {
         .from("auctions")
         .select("id, title, status, current_price, starting_price")
         .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
         .range(from, to),
     ),
     supabase
