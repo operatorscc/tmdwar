@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type FinanceKind = "inventory_purchase" | "sale" | "customer_receipt" | "operating_expense";
 
@@ -98,8 +98,10 @@ export default function FinanceClient() {
   const [historyTo, setHistoryTo] = useState("");
   const [transactionPage, setTransactionPage] = useState(1);
   const [journalPage, setJournalPage] = useState(1);
+  const requestSequence = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestSequence.current;
     setLoading(true);
     setError("");
     try {
@@ -116,11 +118,13 @@ export default function FinanceClient() {
       if (!response.ok) {
         throw new Error(result.error || "Gagal memuat data keuangan.");
       }
+      if (requestId !== requestSequence.current) return;
       setData(result as FinanceData);
     } catch (caught) {
+      if (requestId !== requestSequence.current) return;
       setError(caught instanceof Error ? caught.message : "Terjadi kesalahan saat memuat keuangan.");
     } finally {
-      setLoading(false);
+      if (requestId === requestSequence.current) setLoading(false);
     }
   }, [transactionPage, journalPage, historySearch, historyKind, historyFrom, historyTo]);
 
@@ -389,7 +393,7 @@ export default function FinanceClient() {
               <label className="form-field"><span className="form-label">Dari tanggal</span><input className="form-input" type="date" value={historyFrom} max={historyTo || undefined} onChange={(event) => setHistoryFrom(event.target.value)} /></label>
               <label className="form-field"><span className="form-label">Sampai tanggal</span><input className="form-input" type="date" value={historyTo} min={historyFrom || undefined} onChange={(event) => setHistoryTo(event.target.value)} /></label>
             </div>
-            {!data?.transactions.length ? (
+            {!data?.transactionPagination.total ? (
               <div className="empty-box">Belum ada transaksi keuangan yang dicatat.</div>
             ) : visibleTransactions.length === 0 ? (
               <div className="empty-box">Tidak ada transaksi yang cocok dengan filter.</div>
@@ -438,8 +442,10 @@ export default function FinanceClient() {
             <p style={{ color: "var(--text-secondary)", fontSize: 12, marginBottom: 16 }}>
               Rincian debit-kredit dari transaksi keuangan terbaru. Setiap transaksi yang diposting harus seimbang.
             </p>
-            {!data?.journalLines.length ? (
+            {!data?.journalPagination.total ? (
               <div className="empty-box">Belum ada baris jurnal.</div>
+            ) : data.journalLines.length === 0 ? (
+              <div className="empty-box">Tidak ada baris jurnal pada halaman ini.</div>
             ) : (
               <div style={{ overflowX: "auto" }}>
                 <table className="data-table">
