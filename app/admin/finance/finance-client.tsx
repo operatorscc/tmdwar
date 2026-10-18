@@ -273,6 +273,9 @@ export default function FinanceClient() {
                   </div>
                 </div>
               ))}
+              <p style={{ gridColumn: "1 / -1", color: "var(--text-secondary)", fontSize: 12, margin: "0 2px" }}>
+                Ringkasan dihitung dari seluruh jurnal yang tercatat, bukan hanya hasil pencarian atau filter tanggal di riwayat transaksi. Laba/rugi ini bersifat sementara dan belum tentu mencakup pajak atau penyesuaian akuntansi di luar pencatatan saat ini.
+              </p>
             </div>
           )}
 
