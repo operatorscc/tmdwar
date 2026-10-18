@@ -230,6 +230,9 @@ export default function FinanceClient() {
         <p style={{ color: "var(--text-secondary)", fontSize: 14, marginTop: 8, maxWidth: 760 }}>
           Pencatatan persediaan barang, penjualan, penerimaan pembayaran manual, dan beban operasional dengan jurnal debit-kredit otomatis.
         </p>
+        <Link href="/admin/payments" className="btn-secondary" style={{ display: "inline-flex", marginTop: 14, padding: "10px 14px" }}>
+          Verifikasi Transfer Pembeli
+        </Link>
       </div>
 
       {error && <div className="alert-error" role="alert" style={{ marginBottom: 16, overflowWrap: "anywhere" }}>{error}</div>}
