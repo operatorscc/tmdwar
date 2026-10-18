@@ -91,6 +91,18 @@ export async function GET(request: Request) {
       `counterparty.ilike.%${search}%`,
       `reference.ilike.%${search}%`,
     ];
+    const kindSearchLabels: Record<string, string> = {
+      inventory_purchase: "Pembelian barang",
+      sale: "Penjualan barang",
+      customer_receipt: "Penerimaan pembayaran",
+      operating_expense: "Beban operasional",
+    };
+    const normalizedSearch = search.toLocaleLowerCase("id-ID");
+    for (const [transactionKind, label] of Object.entries(kindSearchLabels)) {
+      if (label.toLocaleLowerCase("id-ID").includes(normalizedSearch)) {
+        searchClauses.push(`kind.eq.${transactionKind}`);
+      }
+    }
     if (matchingAuctionIds.length > 0) {
       searchClauses.push(`auction_id.in.(${matchingAuctionIds.join(",")})`);
     }
