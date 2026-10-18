@@ -103,7 +103,15 @@ export default function FinanceClient() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/admin/finance?page=${transactionPage}&journalPage=${journalPage}`, { cache: "no-store" });
+      const params = new URLSearchParams({
+        page: String(transactionPage),
+        journalPage: String(journalPage),
+        search: historySearch.trim(),
+        kind: historyKind,
+        from: historyFrom,
+        to: historyTo,
+      });
+      const response = await fetch(`/api/admin/finance?${params.toString()}`, { cache: "no-store" });
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.error || "Gagal memuat data keuangan.");
@@ -114,7 +122,7 @@ export default function FinanceClient() {
     } finally {
       setLoading(false);
     }
-  }, [transactionPage, journalPage]);
+  }, [transactionPage, journalPage, historySearch, historyKind, historyFrom, historyTo]);
 
   useEffect(() => {
     void load();
@@ -167,18 +175,7 @@ export default function FinanceClient() {
     return remaining;
   }, [saleByAuction, paidByAuction]);
   const selectedRemaining = remainingByAuction.get(auctionId) ?? 0;
-  const visibleTransactions = useMemo(() => {
-    const query = historySearch.trim().toLocaleLowerCase("id-ID");
-    return (data?.transactions ?? []).filter((transaction) => {
-      if (historyKind !== "all" && transaction.kind !== historyKind) return false;
-      if (historyFrom && transaction.transaction_date < historyFrom) return false;
-      if (historyTo && transaction.transaction_date > historyTo) return false;
-      if (!query) return true;
-      const auctionTitle = transaction.auction_id ? auctionMap.get(transaction.auction_id)?.title ?? "" : "operasional";
-      return [transaction.description, transaction.counterparty, transaction.reference, auctionTitle, KIND_LABELS[transaction.kind]]
-        .some((value) => String(value ?? "").toLocaleLowerCase("id-ID").includes(query));
-    });
-  }, [data?.transactions, historySearch, historyKind, historyFrom, historyTo, auctionMap]);
+  const visibleTransactions = data?.transactions ?? [];
 
   const eligibleAuctions = useMemo(() => {
     const auctions = data?.auctions ?? [];
@@ -379,7 +376,7 @@ export default function FinanceClient() {
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
               <div>
                 <h2 style={{ fontSize: 20, fontWeight: 850 }}>Riwayat transaksi</h2>
-                <p style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 4 }}>Menampilkan halaman {data?.transactionPagination.page ?? 1} dari {data?.transactionPagination.totalPages ?? 1} ({data?.transactionPagination.total ?? 0} transaksi total). Pencarian dan filter berlaku pada halaman yang sedang ditampilkan.</p>
+                <p style={{ color: "var(--text-secondary)", fontSize: 12, marginTop: 4 }}>Menampilkan {data?.transactionPagination.total ?? 0} hasil yang cocok, halaman {data?.transactionPagination.page ?? 1} dari {data?.transactionPagination.totalPages ?? 1}. Pencarian dan filter diterapkan ke seluruh histori.</p>
               </div>
               <Link href="/admin/dashboard" className="btn-secondary" style={{ padding: "9px 14px", alignSelf: "start" }}>Kembali ke dashboard</Link>
             </div>
