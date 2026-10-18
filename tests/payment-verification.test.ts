@@ -55,11 +55,11 @@ describe("Bank transfer payment verification contract", () => {
     assert.match(buyerUi, /Menunggu verifikasi admin/);
   });
   it("keeps the SQL migration structurally complete with no duplicate function blocks or trailing SQL", () => {
-    assert.equal((migration.match(/create or replace function public\\.submit_payment_proof\\(/g) ?? []).length, 1);
-    assert.equal((migration.match(/create or replace function public\\.review_payment_submission\\(/g) ?? []).length, 1);
-    assert.equal((migration.match(/create or replace function public\\.payment_context_for_auction\\(/g) ?? []).length, 1);
+    assert.equal((migration.match(/create or replace function public\.submit_payment_proof\(/g) ?? []).length, 1);
+    assert.equal((migration.match(/create or replace function public\.review_payment_submission\(/g) ?? []).length, 1);
+    assert.equal((migration.match(/create or replace function public\.payment_context_for_auction\(/g) ?? []).length, 1);
     assert.equal((migration.match(/^commit;$/gm) ?? []).length, 1);
-    assert.match(migration.trimEnd(), /\\ncommit;$/);
+    assert.match(migration.trimEnd(), /\ncommit;$/);
   });
 
 });
