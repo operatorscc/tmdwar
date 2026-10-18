@@ -38,6 +38,16 @@ describe("Finance history pagination contract", () => {
     assert.match(client, /Tidak ada baris jurnal pada halaman ini/);
   });
 
+  it("explains that finance summary is global and profit is provisional", () => {
+    assert.match(client, /Ringkasan dihitung dari seluruh jurnal yang tercatat/);
+    assert.match(client, /bukan hanya hasil pencarian atau filter tanggal/);
+    assert.match(client, /belum tentu mencakup pajak atau penyesuaian akuntansi/);
+    assert.match(client, /\["Kas tercatat", data\.summary\.cash\]/);
+    assert.match(client, /\["Nilai persediaan", data\.summary\.inventory\]/);
+    assert.match(client, /\["Piutang pelanggan", data\.summary\.accounts_receivable\]/);
+    assert.match(client, /\["Laba \/ rugi sementara", data\.summary\.net_profit\]/);
+  });
+
   it("prevents an older request from overwriting newer search or filter results", () => {
     assert.match(client, /const requestSequence = useRef\(0\)/);
     assert.match(client, /const requestId = \+\+requestSequence\.current/);
