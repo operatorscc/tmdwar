@@ -101,6 +101,7 @@ declare
   v_uid uuid := auth.uid();
   v_sale_amount bigint;
   v_received bigint;
+  v_archived boolean := false;
 begin
   if v_uid is null then
     raise exception 'Login diperlukan untuk mengajukan pembayaran.';
@@ -136,12 +137,19 @@ begin
     raise exception 'Hanya pemenang resmi lelang yang dapat mengajukan pembayaran.';
   end if;
 
-  -- Archived finance history is immutable; do not accept a submission that
-  -- cannot be approved through the normal finance ledger path.
-  if exists (
-    select 1 from public.auctions a
-    where a.id = p_auction_id and a.archived_at is not null
-  ) then
+  -- Lock the auction before checking archive state. This serializes submission
+  -- against archive_auction, preventing a pending payment from appearing after
+  -- the archive RPC has checked for pending submissions.
+  select coalesce(a.archived_at is not null, false)
+    into v_archived
+    from public.auctions a
+    where a.id = p_auction_id
+    for share;
+
+  if not found then
+    raise exception 'Lelang tidak ditemukan.';
+  end if;
+  if v_archived then
     raise exception 'Lelang sudah diarsipkan. Hubungi admin untuk penyelesaian piutang historis.';
   end if;
 
