@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { type Auction } from "@/lib/auction";
 import { AuctionLiveView, type BidRecord } from "./auction-live-view";
+import PaymentSubmission from "./payment-submission";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -123,6 +124,7 @@ export default async function AuctionDetailPage({ params }: PageProps) {
         initialBids={initialBids}
         user={userSummary}
       />
+      {userSummary && <PaymentSubmission auctionId={auction.id} />}
     </div>
   );
 }
