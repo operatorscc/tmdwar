@@ -39,7 +39,13 @@ describe("Bank transfer payment verification contract", () => {
     assert.match(archiveMigration, /kind = 'customer_receipt'/);
     assert.match(archiveMigration, /v_outstanding > 0/);
     assert.match(archiveMigration, /Lelang tidak dapat diarsipkan karena masih ada piutang penjualan/);
+    assert.match(archiveMigration, /status = 'pending'/);
+    assert.match(archiveMigration, /pengajuan transfer yang menunggu verifikasi/);
     assert.match(archiveMigration, /for update/);
+    const submitFunction = migration.split("create or replace function public.submit_payment_proof(")[1]
+      ?.split("$submit_payment$;")[0] ?? "";
+    assert.match(submitFunction, /for share/);
+    assert.match(submitFunction, /v_archived/);
   });
 
   it("does not post cash or receivable journals before admin approval", () => {
