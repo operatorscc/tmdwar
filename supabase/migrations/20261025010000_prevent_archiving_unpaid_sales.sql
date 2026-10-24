@@ -72,6 +72,18 @@ begin
     raise exception 'Lelang tidak dapat diarsipkan karena masih ada piutang penjualan sebesar %.', v_outstanding;
   end if;
 
+  -- A pending submission must be reviewed before archival, even if a separate
+  -- manual receipt has since settled the receivable. The payment RPC takes a
+  -- FOR SHARE lock on the auction, so this check is serialized with submissions.
+  if exists (
+    select 1
+    from public.payment_submissions s
+    where s.auction_id = p_auction_id
+      and s.status = 'pending'
+  ) then
+    raise exception 'Lelang tidak dapat diarsipkan karena masih ada pengajuan transfer yang menunggu verifikasi.';
+  end if;
+
   select jsonb_build_object(
     'bids', (select count(*) from public.bids where auction_id = p_auction_id),
     'results', (select count(*) from public.auction_results where auction_id = p_auction_id),
