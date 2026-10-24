@@ -136,8 +136,15 @@ begin
     raise exception 'Hanya pemenang resmi lelang yang dapat mengajukan pembayaran.';
   end if;
 
-  -- Archiving hides an auction from active listings; it must not block
-  -- payment of an already-recorded sale or erase the buyer's receivable.
+  -- Archived finance history is immutable; do not accept a submission that
+  -- cannot be approved through the normal finance ledger path.
+  if exists (
+    select 1 from public.auctions a
+    where a.id = p_auction_id and a.archived_at is not null
+  ) then
+    raise exception 'Lelang sudah diarsipkan. Hubungi admin untuk penyelesaian piutang historis.';
+  end if;
+
   select t.amount into v_sale_amount
   from public.finance_transactions t
   where t.auction_id = p_auction_id
@@ -266,6 +273,7 @@ declare
   v_sale_amount bigint;
   v_received bigint;
   v_is_winner boolean;
+  v_archived boolean := false;
   v_submissions jsonb;
 begin
   if v_uid is null then
@@ -277,6 +285,11 @@ begin
     where r.auction_id = p_auction_id and r.winner_bidder_id = v_uid
   ) into v_is_winner;
 
+  select coalesce(a.archived_at is not null, false)
+    into v_archived
+    from public.auctions a
+    where a.id = p_auction_id;
+
   if not v_is_winner then
     return jsonb_build_object('eligible', false);
   end if;
@@ -287,7 +300,7 @@ begin
   limit 1;
 
   if v_sale_amount is null then
-    return jsonb_build_object('eligible', true, 'invoice_ready', false);
+    return jsonb_build_object('eligible', true, 'invoice_ready', false, 'archived', v_archived);
   end if;
 
   select coalesce(sum(t.amount), 0) into v_received
@@ -310,6 +323,7 @@ begin
   return jsonb_build_object(
     'eligible', true,
     'invoice_ready', true,
+    'archived', v_archived,
     'sale_amount', v_sale_amount,
     'received_amount', v_received,
     'outstanding_amount', greatest(v_sale_amount - v_received, 0),
