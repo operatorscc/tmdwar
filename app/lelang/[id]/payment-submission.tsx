@@ -15,6 +15,7 @@ type Submission = {
 type PaymentContext = {
   eligible: boolean;
   invoice_ready?: boolean;
+  archived?: boolean;
   sale_amount?: number | string;
   received_amount?: number | string;
   outstanding_amount?: number | string;
@@ -154,7 +155,12 @@ export default function PaymentSubmission({ auctionId }: { auctionId: string }) 
               </div>
             ))}
           </div>}
-          {Number(context.outstanding_amount ?? 0) > 0 && !(context.submissions ?? []).some(item => item.status === "pending") && (
+          {context.archived && Number(context.outstanding_amount ?? 0) > 0 && (
+            <p role="status" style={{ marginTop: 12, color: "var(--text-secondary)" }}>
+              Lot ini sudah diarsipkan sehingga pengajuan transfer baru tidak dapat diproses melalui alur normal. Hubungi admin untuk penyelesaian piutang historis.
+            </p>
+          )}
+          {!context.archived && Number(context.outstanding_amount ?? 0) > 0 && !(context.submissions ?? []).some(item => item.status === "pending") && (
             <form onSubmit={submit} style={{ display: "grid", gap: 12, maxWidth: 640 }}>
               <p style={{ color: "var(--text-secondary)", fontSize: 13 }}>Unggah bukti transfer untuk pembayaran penuh atau sebagian. Pengajuan belum menambah saldo kas sebelum diverifikasi admin.</p>
               <label>Nominal transfer (Rp)
