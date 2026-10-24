@@ -25,11 +25,21 @@ describe("Bank transfer payment verification contract", () => {
     assert.match(migration, /one_pending_per_auction_bidder/);
   });
 
-  it("allows payment of an already-recorded sale after the auction is archived", () => {
+  it("blocks new payment submissions for archived auctions", () => {
     const submitFunction = migration.split("create or replace function public.submit_payment_proof(")[1]
       ?.split("$submit_payment$;")[0] ?? "";
-    assert.match(submitFunction, /from public\.finance_transactions t[\s\S]*t\.kind = 'sale'/);
-    assert.doesNotMatch(submitFunction, /archived_at/);
+    assert.match(submitFunction, /a\\.archived_at is not null/);
+    assert.match(submitFunction, /Lelang sudah diarsipkan/);
+    assert.match(migration, /'archived', v_archived/);
+  });
+
+  it("prevents archiving an auction with an outstanding sale receivable", () => {
+    const archiveMigration = source("supabase/migrations/20261025010000_prevent_archiving_unpaid_sales.sql");
+    assert.match(archiveMigration, /kind = 'sale'/);
+    assert.match(archiveMigration, /kind = 'customer_receipt'/);
+    assert.match(archiveMigration, /v_outstanding > 0/);
+    assert.match(archiveMigration, /Lelang tidak dapat diarsipkan karena masih ada piutang penjualan/);
+    assert.match(archiveMigration, /for update/);
   });
 
   it("does not post cash or receivable journals before admin approval", () => {
