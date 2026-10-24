@@ -28,7 +28,7 @@ describe("Bank transfer payment verification contract", () => {
   it("blocks new payment submissions for archived auctions", () => {
     const submitFunction = migration.split("create or replace function public.submit_payment_proof(")[1]
       ?.split("$submit_payment$;")[0] ?? "";
-    assert.match(submitFunction, /a\\.archived_at is not null/);
+    assert.match(submitFunction, /a\.archived_at is not null/);
     assert.match(submitFunction, /Lelang sudah diarsipkan/);
     assert.match(migration, /'archived', v_archived/);
   });
